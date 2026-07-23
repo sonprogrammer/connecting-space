@@ -4,11 +4,10 @@ import {
   CheckCircle2,
   HelpCircle,
   LayoutTemplate,
-  MessageSquareText,
   ReceiptText,
-  Sparkles,
 } from "lucide-react";
 
+import { SubmitInquiryForm } from "@/features/submit-inquiry";
 import { buttonVariants } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
 
@@ -196,24 +195,26 @@ export function PublicHome() {
       </Section>
 
       <section id="inquiry" className="bg-[#14261f] px-5 py-16 text-white sm:px-8">
-        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[1fr_0.8fr]">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.78fr_1.22fr]">
           <div>
             <p className="text-sm font-semibold text-[#a8d5ba]">Inquiry</p>
-            <h2 className="mt-3 text-3xl font-semibold">제작 문의 폼으로 연결될 CTA 영역</h2>
-            <p className="mt-4 max-w-2xl leading-7 text-[#d7e5dc]">
-              다음 작업에서 Supabase 등록 API와 연결될 수 있도록 현재는 이동 동선과 화면 구조만 준비했습니다.
+            <h2 className="mt-3 text-3xl font-semibold leading-tight">
+              필요한 범위와 예산을 남기면 제작 가능 여부부터 확인합니다
+            </h2>
+            <p className="mt-4 leading-7 text-[#d7e5dc]">
+              아임웹 계정 상태, 필요한 페이지, 원하는 오픈 시점을 기준으로 제작 범위와
+              다음 확인 사항을 정리해 연락드립니다.
             </p>
+            <div className="mt-8 grid gap-3 text-sm text-[#e9f3ed]">
+              {["제출 즉시 문의가 등록됩니다.", "서버 검증 오류는 필드별로 안내합니다.", "저장 실패 시 다시 시도할 수 있습니다."].map((item) => (
+                <div key={item} className="flex gap-2">
+                  <CheckCircle2 aria-hidden className="mt-0.5 size-4 shrink-0 text-[#a8d5ba]" />
+                  <span>{item}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-col justify-center gap-3 sm:flex-row lg:justify-end">
-            <Link href="#services" className={cn(buttonVariants({ variant: "secondary", size: "lg" }), "h-11 px-4")}>
-              포트폴리오 보기
-              <Sparkles aria-hidden className="size-4" />
-            </Link>
-            <Link href="mailto:hello@example.com" className={cn(buttonVariants({ size: "lg" }), "h-11 bg-white px-4 text-[#14261f] hover:bg-[#eef4ed]")}>
-              이메일 문의
-              <MessageSquareText aria-hidden className="size-4" />
-            </Link>
-          </div>
+          <SubmitInquiryForm />
         </div>
       </section>
     </main>
