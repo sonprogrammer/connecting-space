@@ -1,4 +1,3 @@
-import type { UpdateInquiryStatusInput } from "@/features/update-inquiry-status";
 import type { Database } from "@/shared/types/database.generated";
 
 export type InquiryRow = Database["public"]["Tables"]["inquiries"]["Row"];
@@ -17,7 +16,5 @@ export type AdminInquiryListItem = Pick<
 >;
 
 export type AdminInquiryDetail = InquiryRow;
-
-export type AdminInquiryStatusUpdateRequest = UpdateInquiryStatusInput;
 
 export type AdminInquiryStatusUpdateResponse = AdminInquiryDetail;

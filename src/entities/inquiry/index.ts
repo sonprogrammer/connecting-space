@@ -1,7 +1,6 @@
 export type {
   AdminInquiryDetail,
   AdminInquiryListItem,
-  AdminInquiryStatusUpdateRequest,
   AdminInquiryStatusUpdateResponse,
   InquiryRow,
 } from "./api/contracts";
