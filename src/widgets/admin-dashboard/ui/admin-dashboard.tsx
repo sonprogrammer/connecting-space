@@ -1,5 +1,4 @@
 import {
-  ArrowUpRight,
   Banknote,
   ClipboardList,
   Clock3,
@@ -8,17 +7,13 @@ import {
   UsersRound,
 } from "lucide-react";
 
+import { AdminInquiryList } from "./admin-inquiry-list";
+
 const stats = [
   { label: "신규 문의", value: "7", change: "+3 이번 주", icon: MessageSquareMore },
   { label: "진행 프로젝트", value: "3", change: "2건 제작 중", icon: FolderKanban },
   { label: "미수금", value: "320만원", change: "잔금 확인 필요", icon: Banknote },
   { label: "고객", value: "12", change: "활성 5팀", icon: UsersRound },
-];
-
-const inquiries = [
-  { name: "로컬 필라테스", type: "브랜드 홈페이지", status: "상담 대기", budget: "180만원" },
-  { name: "B2B 솔루션", type: "랜딩 페이지", status: "견적 발송", budget: "250만원" },
-  { name: "카페 프랜차이즈", type: "리뉴얼", status: "자료 요청", budget: "협의" },
 ];
 
 const tasks = [
@@ -62,29 +57,7 @@ export function AdminDashboard() {
         </section>
 
         <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
-          <section className="rounded-lg border border-[#dfe3dc] bg-white">
-            <div className="flex items-center justify-between border-b border-[#e8ebe5] p-5">
-              <div>
-                <h2 className="text-lg font-semibold">최근 문의</h2>
-                <p className="mt-1 text-sm text-[#617068]">백엔드 연동 전 샘플 데이터입니다.</p>
-              </div>
-              <ArrowUpRight aria-hidden className="size-5 text-[#2e6f4f]" />
-            </div>
-            <div className="divide-y divide-[#edf0ea]">
-              {inquiries.map((inquiry) => (
-                <div key={inquiry.name} className="grid gap-3 p-5 sm:grid-cols-[1fr_1fr_auto] sm:items-center">
-                  <div>
-                    <p className="font-medium">{inquiry.name}</p>
-                    <p className="mt-1 text-sm text-[#617068]">{inquiry.type}</p>
-                  </div>
-                  <span className="w-fit rounded-md bg-[#eaf3ed] px-2.5 py-1 text-sm font-medium text-[#23583f]">
-                    {inquiry.status}
-                  </span>
-                  <p className="font-semibold">{inquiry.budget}</p>
-                </div>
-              ))}
-            </div>
-          </section>
+          <AdminInquiryList />
 
           <section className="rounded-lg border border-[#dfe3dc] bg-white p-5">
             <div className="flex items-center gap-3">
