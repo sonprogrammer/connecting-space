@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 
+import type { AdminInquiryListItem } from "@/entities/inquiry";
 import { jsonError, jsonOk } from "@/shared/api/response";
 import { verifyAdminAccessToken } from "@/shared/lib/auth/admin";
 import { getAdminAccessTokenFromRequest } from "@/shared/lib/auth/admin-session";
@@ -26,5 +27,5 @@ export async function GET(request: NextRequest) {
     return jsonError("ADMIN_INQUIRIES_READ_FAILED", error.message, 500);
   }
 
-  return jsonOk(data);
+  return jsonOk<AdminInquiryListItem[]>(data);
 }
