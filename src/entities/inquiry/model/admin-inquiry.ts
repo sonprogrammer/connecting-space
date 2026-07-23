@@ -33,6 +33,8 @@ const dateFormatter = new Intl.DateTimeFormat("ko-KR", {
   day: "2-digit",
 });
 
+const wonFormatter = new Intl.NumberFormat("ko-KR");
+
 export function getInquiryStatusLabel(status: AdminInquiryStatus) {
   return statusLabels[status];
 }
@@ -43,4 +45,36 @@ export function getInquiryPrimaryContact(inquiry: InquiryContact) {
 
 export function formatAdminInquiryCreatedAt(createdAt: string) {
   return dateFormatter.format(new Date(createdAt));
+}
+
+export function formatInquiryBudget(
+  budgetMin: number | null,
+  budgetMax: number | null,
+) {
+  const min = budgetMin === null ? null : `${wonFormatter.format(budgetMin / 10000)}만원`;
+  const max = budgetMax === null ? null : `${wonFormatter.format(budgetMax / 10000)}만원`;
+
+  if (min && max) {
+    return `${min} ~ ${max}`;
+  }
+
+  if (min) {
+    return `${min} 이상`;
+  }
+
+  if (max) {
+    return `${max} 이하`;
+  }
+
+  return "예산 미정";
+}
+
+export function formatInquiryDesiredLaunchDate(
+  desiredLaunchDate: string | null,
+) {
+  if (!desiredLaunchDate) {
+    return "희망일 미정";
+  }
+
+  return dateFormatter.format(new Date(`${desiredLaunchDate}T00:00:00+09:00`));
 }

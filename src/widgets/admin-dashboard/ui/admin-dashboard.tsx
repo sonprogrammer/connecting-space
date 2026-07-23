@@ -56,7 +56,7 @@ export function AdminDashboard() {
           })}
         </section>
 
-        <div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_0.8fr]">
+        <div className="mt-6 grid gap-6">
           <AdminInquiryList />
 
           <section className="rounded-lg border border-[#dfe3dc] bg-white p-5">

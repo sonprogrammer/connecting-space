@@ -3,6 +3,8 @@ import { describe, test } from "node:test";
 
 import {
   formatAdminInquiryCreatedAt,
+  formatInquiryBudget,
+  formatInquiryDesiredLaunchDate,
   getInquiryPrimaryContact,
   getInquiryStatusLabel,
 } from "../src/entities/inquiry/model/admin-inquiry";
@@ -42,5 +44,17 @@ describe("admin inquiry list formatting", () => {
       formatAdminInquiryCreatedAt("2026-07-23T01:23:00.000Z"),
       "2026. 07. 23.",
     );
+  });
+
+  test("formats inquiry budget ranges for admin detail", () => {
+    assert.equal(formatInquiryBudget(2000000, 5000000), "200만원 ~ 500만원");
+    assert.equal(formatInquiryBudget(2000000, null), "200만원 이상");
+    assert.equal(formatInquiryBudget(null, 5000000), "500만원 이하");
+    assert.equal(formatInquiryBudget(null, null), "예산 미정");
+  });
+
+  test("formats desired launch dates for admin detail", () => {
+    assert.equal(formatInquiryDesiredLaunchDate("2026-08-15"), "2026. 08. 15.");
+    assert.equal(formatInquiryDesiredLaunchDate(null), "희망일 미정");
   });
 });

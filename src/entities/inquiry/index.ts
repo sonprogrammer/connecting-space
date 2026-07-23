@@ -12,6 +12,8 @@ export type {
 } from "./model/admin-inquiry";
 export {
   formatAdminInquiryCreatedAt,
+  formatInquiryBudget,
+  formatInquiryDesiredLaunchDate,
   getInquiryPrimaryContact,
   getInquiryStatusLabel,
 } from "./model/admin-inquiry";
