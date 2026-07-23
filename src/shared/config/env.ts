@@ -3,7 +3,9 @@ const publicSupabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export const publicEnv = {
   appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-  supabaseUrl: publicSupabaseUrl ?? "",
+  supabaseUrl: publicSupabaseUrl
+    ? normalizeSupabaseProjectUrl(publicSupabaseUrl)
+    : "",
   supabaseAnonKey: publicSupabaseAnonKey ?? "",
 };
 
@@ -15,7 +17,7 @@ export function assertPublicSupabaseEnv() {
   }
 
   return {
-    supabaseUrl: publicSupabaseUrl,
+    supabaseUrl: normalizeSupabaseProjectUrl(publicSupabaseUrl),
     supabaseAnonKey: publicSupabaseAnonKey,
   };
 }
@@ -31,4 +33,14 @@ export function assertServerSupabaseEnv() {
     ...assertPublicSupabaseEnv(),
     serviceRoleKey,
   };
+}
+
+export function normalizeSupabaseProjectUrl(value: string) {
+  const url = new URL(value);
+
+  url.pathname = url.pathname.replace(/\/(?:rest|auth|storage)\/v1\/?$/, "");
+  url.search = "";
+  url.hash = "";
+
+  return url.toString().replace(/\/$/, "");
 }
