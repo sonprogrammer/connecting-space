@@ -5,6 +5,8 @@ import type { AdminInquiryDetail } from "../src/entities/inquiry";
 import {
   buildConversionCustomerPayload,
   buildConversionProjectPayload,
+  findInquiryCustomer,
+  findInquiryProject,
   isInquiryConverted,
 } from "../src/features/convert-inquiry-to-project/model/conversion-payload";
 
@@ -84,6 +86,62 @@ describe("inquiry conversion payloads", () => {
         contractAmount: 5000000,
         expectedLaunchDate: "2026-09-01",
         memo: "1차 범위 확정",
+      },
+    );
+  });
+
+  test("finds existing customer and project records linked to the inquiry", () => {
+    assert.deepEqual(
+      findInquiryCustomer(baseInquiry.id, [
+        {
+          id: "22222222-2222-4222-8222-222222222222",
+          inquiry_id: baseInquiry.id,
+          name: "손영진",
+          email: "youngjin@example.com",
+          phone: "010-1234-5678",
+          company_name: "커넥팅 스페이스",
+          website_url: "https://example.com",
+          created_at: "2026-07-23T01:23:00.000Z",
+          updated_at: "2026-07-23T01:23:00.000Z",
+        },
+      ]),
+      {
+        id: "22222222-2222-4222-8222-222222222222",
+        inquiry_id: baseInquiry.id,
+        name: "손영진",
+        email: "youngjin@example.com",
+        phone: "010-1234-5678",
+        company_name: "커넥팅 스페이스",
+        website_url: "https://example.com",
+        created_at: "2026-07-23T01:23:00.000Z",
+        updated_at: "2026-07-23T01:23:00.000Z",
+      },
+    );
+
+    assert.deepEqual(
+      findInquiryProject(baseInquiry.id, [
+        {
+          id: "33333333-3333-4333-8333-333333333333",
+          customer_id: "22222222-2222-4222-8222-222222222222",
+          inquiry_id: baseInquiry.id,
+          name: "커넥팅 스페이스 홈페이지",
+          status: "planning",
+          contract_amount: 5000000,
+          expected_launch_date: "2026-09-01",
+          created_at: "2026-07-23T01:23:00.000Z",
+          updated_at: "2026-07-23T01:23:00.000Z",
+        },
+      ]),
+      {
+        id: "33333333-3333-4333-8333-333333333333",
+        customer_id: "22222222-2222-4222-8222-222222222222",
+        inquiry_id: baseInquiry.id,
+        name: "커넥팅 스페이스 홈페이지",
+        status: "planning",
+        contract_amount: 5000000,
+        expected_launch_date: "2026-09-01",
+        created_at: "2026-07-23T01:23:00.000Z",
+        updated_at: "2026-07-23T01:23:00.000Z",
       },
     );
   });

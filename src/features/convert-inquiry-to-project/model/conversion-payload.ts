@@ -1,6 +1,6 @@
 import type { AdminInquiryDetail } from "@/entities/inquiry";
-import type { CreateCustomerInput } from "@/entities/customer";
-import type { CreateProjectInput } from "@/entities/project";
+import type { AdminCustomerListItem, CreateCustomerInput } from "@/entities/customer";
+import type { AdminProjectListItem, CreateProjectInput } from "@/entities/project";
 
 export type ConversionCustomerFormValues = {
   customerName: string;
@@ -53,4 +53,18 @@ export function buildConversionProjectPayload(
     expectedLaunchDate: values.expectedLaunchDate,
     memo: values.projectMemo.trim(),
   };
+}
+
+export function findInquiryCustomer(
+  inquiryId: string,
+  customers: AdminCustomerListItem[],
+) {
+  return customers.find((customer) => customer.inquiry_id === inquiryId) ?? null;
+}
+
+export function findInquiryProject(
+  inquiryId: string,
+  projects: AdminProjectListItem[],
+) {
+  return projects.find((project) => project.inquiry_id === inquiryId) ?? null;
 }

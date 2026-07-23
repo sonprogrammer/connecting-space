@@ -3,22 +3,37 @@
 import { useState } from "react";
 import { CheckCircle2, Loader2, UserRoundPlus } from "lucide-react";
 
-import type { AdminCustomerCreateResponse } from "@/entities/customer";
+import type {
+  AdminCustomerCreateResponse,
+  AdminCustomerListItem,
+} from "@/entities/customer";
 import type { AdminInquiryDetail } from "@/entities/inquiry";
-import type { AdminProjectCreateResponse } from "@/entities/project";
+import type {
+  AdminProjectCreateResponse,
+  AdminProjectListItem,
+} from "@/entities/project";
 import { Button } from "@/shared/ui/button";
 import type { ApiResponse } from "@/shared/types/api";
 
 import {
   buildConversionCustomerPayload,
   buildConversionProjectPayload,
+  findInquiryCustomer,
+  findInquiryProject,
   isInquiryConverted,
 } from "../model/conversion-payload";
 
 type ConversionState =
   | { status: "idle" }
   | { status: "converting" }
-  | { status: "success"; customerId: string; projectId: string; projectName: string }
+  | {
+      status: "success";
+      customerId: string;
+      projectId: string;
+      projectName: string;
+      reusedCustomer: boolean;
+      reusedProject: boolean;
+    }
   | { status: "error"; message: string };
 
 type InquiryConversionPanelProps = Readonly<{
@@ -70,6 +85,34 @@ export function InquiryConversionPanel({
     return result.data;
   }
 
+  async function fetchExistingCustomer() {
+    const response = await fetch("/api/admin/customers", {
+      headers: {
+        Accept: "application/json",
+      },
+    });
+    const customers = await parseJsonResponse<AdminCustomerListItem[]>(
+      response,
+      "기존 고객 목록을 확인하지 못했습니다.",
+    );
+
+    return customers ? findInquiryCustomer(inquiry.id, customers) : null;
+  }
+
+  async function fetchExistingProject() {
+    const response = await fetch("/api/admin/projects", {
+      headers: {
+        Accept: "application/json",
+      },
+    });
+    const projects = await parseJsonResponse<AdminProjectListItem[]>(
+      response,
+      "기존 프로젝트 목록을 확인하지 못했습니다.",
+    );
+
+    return projects ? findInquiryProject(inquiry.id, projects) : null;
+  }
+
   async function convertInquiry() {
     if (disabled) {
       return;
@@ -78,51 +121,63 @@ export function InquiryConversionPanel({
     setConversionState({ status: "converting" });
 
     try {
-      const customerResponse = await fetch("/api/admin/customers", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(
-          buildConversionCustomerPayload(inquiry, {
-            customerName,
-            customerMemo,
-          }),
-        ),
-      });
-      const customer = await parseJsonResponse<AdminCustomerCreateResponse>(
-        customerResponse,
-        "고객을 생성하지 못했습니다.",
-      );
+      let reusedCustomer = true;
+      let customer = await fetchExistingCustomer();
 
       if (!customer) {
-        return;
+        reusedCustomer = false;
+        const customerResponse = await fetch("/api/admin/customers", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(
+            buildConversionCustomerPayload(inquiry, {
+              customerName,
+              customerMemo,
+            }),
+          ),
+        });
+        customer = await parseJsonResponse<AdminCustomerCreateResponse>(
+          customerResponse,
+          "고객을 생성하지 못했습니다.",
+        );
+
+        if (!customer) {
+          return;
+        }
       }
 
-      const projectResponse = await fetch("/api/admin/projects", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(
-          buildConversionProjectPayload(inquiry, {
-            customerId: customer.id,
-            projectName,
-            contractAmount,
-            expectedLaunchDate,
-            projectMemo,
-          }),
-        ),
-      });
-      const project = await parseJsonResponse<AdminProjectCreateResponse>(
-        projectResponse,
-        "프로젝트를 생성하지 못했습니다.",
-      );
+      let reusedProject = true;
+      let project = await fetchExistingProject();
 
       if (!project) {
-        return;
+        reusedProject = false;
+        const projectResponse = await fetch("/api/admin/projects", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(
+            buildConversionProjectPayload(inquiry, {
+              customerId: customer.id,
+              projectName,
+              contractAmount,
+              expectedLaunchDate,
+              projectMemo,
+            }),
+          ),
+        });
+        project = await parseJsonResponse<AdminProjectCreateResponse>(
+          projectResponse,
+          "프로젝트를 생성하지 못했습니다.",
+        );
+
+        if (!project) {
+          return;
+        }
       }
 
       const inquiryResponse = await fetch(`/api/admin/inquiries/${inquiry.id}`, {
@@ -151,6 +206,8 @@ export function InquiryConversionPanel({
         customerId: customer.id,
         projectId: project.id,
         projectName: project.name,
+        reusedCustomer,
+        reusedProject,
       });
     } catch (error) {
       setConversionState({
@@ -262,6 +319,13 @@ export function InquiryConversionPanel({
             <span>고객 ID: {conversionState.customerId}</span>
             <span>프로젝트: {conversionState.projectName}</span>
             <span>프로젝트 ID: {conversionState.projectId}</span>
+            {conversionState.reusedCustomer || conversionState.reusedProject ? (
+              <span>
+                기존 생성 항목을 재사용했습니다
+                {conversionState.reusedCustomer ? " · 고객" : ""}
+                {conversionState.reusedProject ? " · 프로젝트" : ""}
+              </span>
+            ) : null}
           </div>
         </div>
       ) : null}
