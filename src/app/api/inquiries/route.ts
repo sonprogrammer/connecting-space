@@ -1,6 +1,6 @@
 import { createInquirySchema } from "@/features/submit-inquiry/schemas/inquiry.schema";
 import { jsonError, jsonOk } from "@/shared/api/response";
-import { createSupabaseServerClient } from "@/shared/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/shared/lib/supabase/server";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
 
   const input = parsed.data;
   const inquiryId = crypto.randomUUID();
-  const supabase = createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
   const { error } = await supabase
     .from("inquiries")
     .insert({
