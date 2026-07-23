@@ -22,6 +22,7 @@ import {
   getInquiryPrimaryContact,
   getInquiryStatusLabel,
 } from "@/entities/inquiry";
+import { InquiryConversionPanel } from "@/features/convert-inquiry-to-project";
 import { Button } from "@/shared/ui/button";
 import type { ApiResponse } from "@/shared/types/api";
 
@@ -569,6 +570,8 @@ function InquiryDetailForm({
             저장
           </Button>
         </div>
+
+        <InquiryConversionPanel inquiry={inquiry} onInquiryUpdated={onUpdated} />
       </div>
     </section>
   );
