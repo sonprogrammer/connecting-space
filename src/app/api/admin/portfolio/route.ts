@@ -24,7 +24,11 @@ export async function GET(request: NextRequest) {
     .limit(100);
 
   if (error) {
-    return jsonError("ADMIN_PORTFOLIO_READ_FAILED", error.message, 500);
+    return jsonError(
+      "ADMIN_PORTFOLIO_READ_FAILED",
+      "Failed to read portfolio items",
+      500,
+    );
   }
 
   return jsonOk<AdminPortfolioListItem[]>(data);
@@ -61,7 +65,7 @@ export async function POST(request: NextRequest) {
     if (projectError) {
       return jsonError(
         "ADMIN_PORTFOLIO_PROJECT_READ_FAILED",
-        projectError.message,
+        "Failed to validate portfolio project",
         500,
       );
     }
@@ -102,8 +106,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (error?.code === "23503") {
+    return jsonError(
+      "INVALID_PORTFOLIO_PROJECT",
+      "Portfolio project not found",
+      400,
+    );
+  }
+
   if (error) {
-    return jsonError("ADMIN_PORTFOLIO_CREATE_FAILED", error.message, 500);
+    return jsonError(
+      "ADMIN_PORTFOLIO_CREATE_FAILED",
+      "Failed to create portfolio item",
+      500,
+    );
   }
 
   return jsonOk<AdminPortfolioCreateResponse>(data, { status: 201 });

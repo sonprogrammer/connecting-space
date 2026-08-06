@@ -132,6 +132,20 @@ describe("portfolio schemas", () => {
       createPortfolioSchema.safeParse({ ...validInput, sortOrder: 1.5 }).success,
       false,
     );
+    assert.equal(
+      createPortfolioSchema.safeParse({
+        ...validInput,
+        sortOrder: 2_147_483_647,
+      }).success,
+      true,
+    );
+    assert.equal(
+      createPortfolioSchema.safeParse({
+        ...validInput,
+        sortOrder: 2_147_483_648,
+      }).success,
+      false,
+    );
   });
 
   test("requires at least one update field", () => {

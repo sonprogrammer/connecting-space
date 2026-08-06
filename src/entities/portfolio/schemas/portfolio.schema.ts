@@ -23,7 +23,7 @@ export const createPortfolioSchema = z.object({
   siteUrl: optionalHttpUrl.optional(),
   industry: z.string().trim().max(80).optional().or(z.literal("")),
   isPublished: z.boolean().optional(),
-  sortOrder: z.number().int().nonnegative().optional(),
+  sortOrder: z.number().int().nonnegative().max(2_147_483_647).optional(),
 });
 
 export const updatePortfolioSchema = createPortfolioSchema.partial().refine(

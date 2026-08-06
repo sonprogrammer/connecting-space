@@ -16,7 +16,11 @@ export async function GET() {
     .limit(100);
 
   if (error) {
-    return jsonError("PUBLIC_PORTFOLIO_READ_FAILED", error.message, 500);
+    return jsonError(
+      "PUBLIC_PORTFOLIO_READ_FAILED",
+      "Failed to read public portfolio items",
+      500,
+    );
   }
 
   return jsonOk<PublicPortfolioListItem[]>(data);

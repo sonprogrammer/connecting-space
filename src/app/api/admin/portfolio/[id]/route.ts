@@ -62,7 +62,11 @@ export async function GET(
     .maybeSingle();
 
   if (error) {
-    return jsonError("ADMIN_PORTFOLIO_READ_FAILED", error.message, 500);
+    return jsonError(
+      "ADMIN_PORTFOLIO_READ_FAILED",
+      "Failed to read portfolio item",
+      500,
+    );
   }
 
   if (!data) {
@@ -112,7 +116,11 @@ export async function PATCH(
     .maybeSingle();
 
   if (readError) {
-    return jsonError("ADMIN_PORTFOLIO_READ_FAILED", readError.message, 500);
+    return jsonError(
+      "ADMIN_PORTFOLIO_READ_FAILED",
+      "Failed to read portfolio item",
+      500,
+    );
   }
 
   if (!existing) {
@@ -133,7 +141,7 @@ export async function PATCH(
     if (projectError) {
       return jsonError(
         "ADMIN_PORTFOLIO_PROJECT_READ_FAILED",
-        projectError.message,
+        "Failed to validate portfolio project",
         500,
       );
     }
@@ -147,14 +155,19 @@ export async function PATCH(
     }
   }
 
-  const nextPublished = input.isPublished ?? existing.is_published;
   const now = new Date().toISOString();
-  const publishedAt = resolvePublishedAt(
-    existing.is_published,
-    existing.published_at,
-    nextPublished,
-    now,
-  );
+  const publicationUpdate =
+    input.isPublished === undefined
+      ? {}
+      : {
+          is_published: input.isPublished,
+          published_at: resolvePublishedAt(
+            existing.is_published,
+            existing.published_at,
+            input.isPublished,
+            now,
+          ),
+        };
   const update: Database["public"]["Tables"]["portfolio_items"]["Update"] = {
     ...(input.projectId !== undefined ? { project_id: input.projectId } : {}),
     ...(input.title !== undefined ? { title: input.title } : {}),
@@ -171,11 +184,8 @@ export async function PATCH(
     ...(input.industry !== undefined
       ? { industry: input.industry || null }
       : {}),
-    ...(input.isPublished !== undefined
-      ? { is_published: input.isPublished }
-      : {}),
+    ...publicationUpdate,
     ...(input.sortOrder !== undefined ? { sort_order: input.sortOrder } : {}),
-    published_at: publishedAt,
     updated_at: now,
   };
 
@@ -194,8 +204,20 @@ export async function PATCH(
     );
   }
 
+  if (error?.code === "23503") {
+    return jsonError(
+      "INVALID_PORTFOLIO_PROJECT",
+      "Portfolio project not found",
+      400,
+    );
+  }
+
   if (error) {
-    return jsonError("ADMIN_PORTFOLIO_UPDATE_FAILED", error.message, 500);
+    return jsonError(
+      "ADMIN_PORTFOLIO_UPDATE_FAILED",
+      "Failed to update portfolio item",
+      500,
+    );
   }
 
   if (!data) {
