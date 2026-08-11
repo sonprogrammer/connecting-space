@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import { AdminInquiryList } from "./admin-inquiry-list";
+import { AdminPortfolioManager } from "@/widgets/admin-portfolio";
 
 const stats = [
   { label: "신규 문의", value: "7", change: "+3 이번 주", icon: MessageSquareMore },
@@ -58,6 +59,8 @@ export function AdminDashboard() {
 
         <div className="mt-6 grid gap-6">
           <AdminInquiryList />
+
+          <AdminPortfolioManager />
 
           <section className="rounded-lg border border-[#dfe3dc] bg-white p-5">
             <div className="flex items-center gap-3">
