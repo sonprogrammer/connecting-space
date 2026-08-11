@@ -17,6 +17,7 @@ export default function PublicLayout({
           </Link>
           <div className="hidden items-center gap-6 text-sm font-medium text-[#526057] md:flex">
             <Link href="/#services">서비스</Link>
+            <Link href="/#portfolio">포트폴리오</Link>
             <Link href="/#process">제작 과정</Link>
             <Link href="/#pricing">가격</Link>
             <Link href="/#faq">FAQ</Link>
