@@ -23,7 +23,10 @@ export function toAdminPortfolioListState(
       };
     }
 
-    return { status: "error", message: result.error.message };
+    return {
+      status: "error",
+      message: "포트폴리오 목록을 불러오지 못했습니다.",
+    };
   }
 
   return { status: "success", items: result.data };

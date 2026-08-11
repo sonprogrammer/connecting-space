@@ -30,12 +30,12 @@ describe("public portfolio state", () => {
     });
   });
 
-  test("uses the API error message for a retryable section error", () => {
+  test("uses a safe Korean message for a retryable section error", () => {
     assert.deepEqual(
       toPublicPortfolioState({
         error: {
           code: "PORTFOLIO_FETCH_FAILED",
-          message: "포트폴리오를 불러오지 못했습니다.",
+          message: "Failed to read portfolio items",
         },
       }),
       {

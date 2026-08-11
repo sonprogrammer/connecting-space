@@ -34,9 +34,9 @@ describe("admin portfolio state", () => {
   test("maps list failures to an error state", () => {
     assert.deepEqual(
       toAdminPortfolioListState({
-        error: { code: "READ_FAILED", message: "목록 조회 실패" },
+        error: { code: "READ_FAILED", message: "Failed to read portfolio items" },
       }),
-      { status: "error", message: "목록 조회 실패" },
+      { status: "error", message: "포트폴리오 목록을 불러오지 못했습니다." },
     );
   });
 
