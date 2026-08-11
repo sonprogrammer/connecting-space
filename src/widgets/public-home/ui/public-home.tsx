@@ -10,6 +10,7 @@ import {
 import { SubmitInquiryForm } from "@/features/submit-inquiry";
 import { buttonVariants } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
+import { PublicPortfolioSection } from "@/widgets/public-portfolio";
 
 const services = [
   {
@@ -148,6 +149,8 @@ export function PublicHome() {
           ))}
         </div>
       </Section>
+
+      <PublicPortfolioSection />
 
       <Section id="process" eyebrow="Process" title="진행 과정은 짧고 확인 가능하게 유지합니다">
         <div className="grid gap-3 md:grid-cols-4">
