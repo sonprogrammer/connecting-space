@@ -35,6 +35,19 @@ export function assertServerSupabaseEnv() {
   };
 }
 
+export function assertAutomationEnv() {
+  const values = {
+    openaiApiKey: process.env.OPENAI_API_KEY,
+    openaiModel: process.env.OPENAI_INQUIRY_REPLY_MODEL,
+    slackWebhookUrl: process.env.SLACK_INQUIRY_WEBHOOK_URL,
+    processSecret: process.env.AUTOMATION_PROCESS_SECRET,
+    adminBaseUrl: process.env.ADMIN_BASE_URL,
+  };
+  const missing = Object.entries(values).filter(([, value]) => !value).map(([key]) => key);
+  if (missing.length) throw new Error(`Missing automation environment variables: ${missing.join(", ")}`);
+  return values as { [K in keyof typeof values]: string };
+}
+
 export function normalizeSupabaseProjectUrl(value: string) {
   const url = new URL(value);
 
