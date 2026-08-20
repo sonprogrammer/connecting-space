@@ -201,6 +201,90 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["portfolio_items"]["Insert"]>;
         Relationships: [];
       };
+      service_offerings: {
+        Row: {
+          id: string; slug: string; name: string; description: string;
+          price_label: string; price_min: number | null; price_max: number | null;
+          duration_label: string; included_items: Json; excluded_items: Json;
+          ai_guidance: string | null; is_published: boolean; sort_order: number;
+          created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; slug: string; name: string; description: string;
+          price_label: string; price_min?: number | null; price_max?: number | null;
+          duration_label: string; included_items?: Json; excluded_items?: Json;
+          ai_guidance?: string | null; is_published?: boolean; sort_order?: number;
+          created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["service_offerings"]["Insert"]>;
+        Relationships: [];
+      };
+      faq_items: {
+        Row: {
+          id: string; question: string; answer: string; ai_guidance: string | null;
+          is_published: boolean; sort_order: number; created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; question: string; answer: string; ai_guidance?: string | null;
+          is_published?: boolean; sort_order?: number; created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["faq_items"]["Insert"]>;
+        Relationships: [];
+      };
+      inquiry_reply_drafts: {
+        Row: {
+          id: string; inquiry_id: string; generation_record_id: string | null;
+          summary: string; draft_text: string; needs_confirmation: Json;
+          status: Database["public"]["Enums"]["inquiry_reply_draft_status"];
+          last_error: string | null; updated_by: string | null; created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; inquiry_id: string; generation_record_id?: string | null;
+          summary?: string; draft_text?: string; needs_confirmation?: Json;
+          status?: Database["public"]["Enums"]["inquiry_reply_draft_status"];
+          last_error?: string | null; updated_by?: string | null; created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["inquiry_reply_drafts"]["Insert"]>;
+        Relationships: [];
+      };
+      automation_jobs: {
+        Row: {
+          id: string; inquiry_id: string;
+          job_type: Database["public"]["Enums"]["automation_job_type"];
+          status: Database["public"]["Enums"]["automation_job_status"];
+          payload: Json; attempt_count: number; max_attempts: number; available_at: string;
+          locked_at: string | null; locked_by: string | null; last_error: string | null;
+          completed_at: string | null; created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; inquiry_id: string;
+          job_type: Database["public"]["Enums"]["automation_job_type"];
+          status?: Database["public"]["Enums"]["automation_job_status"];
+          payload?: Json; attempt_count?: number; max_attempts?: number; available_at?: string;
+          locked_at?: string | null; locked_by?: string | null; last_error?: string | null;
+          completed_at?: string | null; created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["automation_jobs"]["Insert"]>;
+        Relationships: [];
+      };
+      notification_deliveries: {
+        Row: {
+          id: string; inquiry_id: string; draft_id: string;
+          channel: Database["public"]["Enums"]["notification_channel"];
+          status: Database["public"]["Enums"]["notification_delivery_status"];
+          attempt_count: number; last_error: string | null; sent_at: string | null;
+          created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; inquiry_id: string; draft_id: string;
+          channel?: Database["public"]["Enums"]["notification_channel"];
+          status?: Database["public"]["Enums"]["notification_delivery_status"];
+          attempt_count?: number; last_error?: string | null; sent_at?: string | null;
+          created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["notification_deliveries"]["Insert"]>;
+        Relationships: [];
+      };
       ai_generation_records: {
         Row: {
           id: string;
@@ -242,6 +326,18 @@ export type Database = {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
+      enqueue_automation_job: {
+        Args: { p_inquiry_id: string; p_job_type: Database["public"]["Enums"]["automation_job_type"]; p_payload?: Json };
+        Returns: string;
+      };
+      create_inquiry_with_automation: {
+        Args: { p_inquiry: Json };
+        Returns: Array<{ id: string; status: Database["public"]["Enums"]["inquiry_status"] }>;
+      };
+      claim_automation_jobs: {
+        Args: { p_worker_id: string; p_limit?: number; p_now?: string };
+        Returns: Database["public"]["Tables"]["automation_jobs"]["Row"][];
+      };
     };
     Enums: {
       inquiry_status: "new" | "contacted" | "qualified" | "converted" | "closed";
@@ -259,6 +355,11 @@ export type Database = {
         | "proposal"
         | "contract"
         | "imweb_code";
+      inquiry_reply_draft_status: "generating" | "ready" | "failed";
+      automation_job_type: "generate_inquiry_reply" | "send_slack_notification";
+      automation_job_status: "pending" | "processing" | "retry" | "completed" | "failed";
+      notification_channel: "slack";
+      notification_delivery_status: "pending" | "processing" | "retry" | "sent" | "failed";
     };
     CompositeTypes: Record<string, never>;
   };

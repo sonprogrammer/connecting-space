@@ -1,6 +1,7 @@
 import { createInquirySchema } from "@/features/submit-inquiry/schemas/inquiry.schema";
 import { jsonError, jsonOk } from "@/shared/api/response";
 import { createSupabaseAdminClient } from "@/shared/lib/supabase/server";
+import { processAutomationJobs } from "@/shared/lib/automation/processor";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -16,12 +17,9 @@ export async function POST(request: Request) {
   }
 
   const input = parsed.data;
-  const inquiryId = crypto.randomUUID();
   const supabase = createSupabaseAdminClient();
-  const { error } = await supabase
-    .from("inquiries")
-    .insert({
-      id: inquiryId,
+  const { data, error } = await supabase.rpc("create_inquiry_with_automation", {
+    p_inquiry: {
       customer_name: input.customerName,
       email: input.email || null,
       phone: input.phone || null,
@@ -33,11 +31,17 @@ export async function POST(request: Request) {
       desired_launch_date: input.desiredLaunchDate || null,
       message: input.message,
       source: input.source || null,
-    });
+    },
+  });
 
-  if (error) {
-    return jsonError("INQUIRY_CREATE_FAILED", error.message, 500);
+  const created = data?.[0];
+  if (error || !created) {
+    return jsonError("INQUIRY_CREATE_FAILED", "Failed to create inquiry", 500);
   }
 
-  return jsonOk({ id: inquiryId, status: "new" }, { status: 201 });
+  after(async () => {
+    await processAutomationJobs({ limit: 1 }).catch(() => undefined);
+  });
+  return jsonOk({ id: created.id, status: created.status }, { status: 201 });
 }
+import { after } from "next/server";
