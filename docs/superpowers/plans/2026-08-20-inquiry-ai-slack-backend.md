@@ -6,7 +6,7 @@
 
 **Architecture:** Supabase PostgreSQL owns the durable job queue, locking, idempotency, and RLS boundaries. Next.js Route Handlers expose public/admin/internal contracts, while focused server modules call an environment-selected OpenAI-compatible AI provider and Slack Incoming Webhooks through dependency-injected fetch clients. `POST /api/inquiries` commits the inquiry and first job through one service-role RPC, returns `201`, then invokes one best-effort worker pass with Next.js `after()`.
 
-**Tech Stack:** Next.js 16.2.11 Route Handlers and `after()`, TypeScript 5, Zod 4, Supabase JS 2, PostgreSQL migrations/RLS/functions, OpenAI-compatible Chat Completions structured outputs (Groq default; Gemini/OpenAI/custom supported), Slack Incoming Webhooks, Node test runner.
+**Tech Stack:** Next.js 16.2.11 Route Handlers and `after()`, TypeScript 5, Zod 4, Supabase JS 2, PostgreSQL migrations/RLS/functions, OpenAI-compatible Chat Completions structured outputs (OpenAI default; Groq/Gemini/custom supported), Slack Incoming Webhooks, Node test runner.
 
 **Spec:** `docs/superpowers/specs/2026-08-17-inquiry-ai-slack-automation-design.md`
 

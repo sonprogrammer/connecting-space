@@ -147,7 +147,7 @@ type InquiryReplyResult = {
 
 구조 검증 실패나 API 오류도 생성 기록과 작업 오류에 남긴다. 원문 프롬프트를 저장할 때 비밀키는 포함하지 않는다.
 
-공급자 연동은 OpenAI 호환 Chat Completions 계약으로 캡슐화한다. 기본 운영값은 Groq이며 `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`만 바꿔 Gemini 또는 OpenAI로 전환할 수 있다. 기타 호환 공급자는 `AI_PROVIDER=custom`과 `AI_BASE_URL`을 사용한다.
+공급자 연동은 OpenAI 호환 Chat Completions 계약으로 캡슐화한다. 기본 예시는 기존 설계와 같은 OpenAI이며 `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`만 바꿔 Groq 또는 Gemini로 전환할 수 있다. 기타 호환 공급자는 `AI_PROVIDER=custom`과 `AI_BASE_URL`을 사용한다.
 
 ## API 설계
 

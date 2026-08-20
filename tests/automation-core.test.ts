@@ -69,6 +69,14 @@ describe("Slack privacy", () => {
     summary: "요약", draft: "초안", needsConfirmation: [{ topic: "일정", reason: "근거 부족", suggestedQuestion: "가능 일정을 확인해 주세요." }],
     adminBaseUrl: "https://admin.example.com",
   };
+  const getSectionTexts = (message: ReturnType<typeof buildSlackMessage>) => message.blocks.flatMap((block) => {
+    const text = (block as { text?: { text?: unknown } }).text?.text;
+    return typeof text === "string" ? [text] : [];
+  });
+  const getSectionFieldTexts = (message: ReturnType<typeof buildSlackMessage>) => message.blocks.flatMap((block) => {
+    const fields = (block as { fields?: Array<{ text?: unknown }> }).fields ?? [];
+    return fields.flatMap((field) => typeof field.text === "string" ? [field.text] : []);
+  });
 
   it("omits contact details and full inquiry text", () => {
     const serialized = JSON.stringify(buildSlackMessage(input));
@@ -76,6 +84,52 @@ describe("Slack privacy", () => {
     assert.equal(serialized.includes(input.phone), false);
     assert.equal(serialized.includes(input.message), false);
     assert.match(serialized, /김고객/);
+  });
+
+  it("keeps the exact 3,000-character draft boundary without truncation", () => {
+    const message = buildSlackMessage({ ...input, draft: "가".repeat(2992) });
+    const draftText = getSectionTexts(message).find((text) => text.startsWith("*답변 초안*"));
+    assert.ok(draftText);
+    assert.equal(draftText.length, 3000);
+    assert.equal(draftText.includes("전체 내용은 관리자 페이지에서 확인"), false);
+  });
+
+  it("truncates a 12,000-character draft and links to the full admin detail", () => {
+    const message = buildSlackMessage({ ...input, draft: "가".repeat(12000) });
+    const sectionTexts = getSectionTexts(message);
+    const draftText = sectionTexts.find((text) => text.startsWith("*답변 초안*"));
+    assert.ok(draftText);
+    assert.equal(sectionTexts.every((text) => text.length <= 3000), true);
+    assert.match(draftText, /전체 내용은 관리자 페이지에서 확인/);
+    assert.match(draftText, /https:\/\/admin\.example\.com\/admin\/inquiries\/00000000-0000-4000-8000-000000000001/);
+  });
+
+  it("truncates 30 maximum-sized confirmation items within every section limit", () => {
+    const needsConfirmation = Array.from({ length: 30 }, (_, index) => ({
+      topic: `${index}`.padEnd(200, "주"),
+      reason: "이".repeat(1000),
+      suggestedQuestion: "질".repeat(1000),
+    }));
+    const message = buildSlackMessage({ ...input, draft: "가".repeat(12000), needsConfirmation });
+    const sectionTexts = getSectionTexts(message);
+    const confirmationText = sectionTexts.find((text) => text.startsWith("*확인 필요 사항*"));
+    assert.ok(confirmationText);
+    assert.equal(sectionTexts.every((text) => text.length <= 3000), true);
+    assert.match(confirmationText, /전체 내용은 관리자 페이지에서 확인/);
+    assert.match(confirmationText, /https:\/\/admin\.example\.com\/admin\/inquiries\/00000000-0000-4000-8000-000000000001/);
+    assert.equal(getSectionFieldTexts(message).every((text) => text.length <= 2000), true);
+  });
+
+  it("uses only the admin origin so a long base path cannot overflow sections", () => {
+    const message = buildSlackMessage({
+      ...input,
+      adminBaseUrl: `https://admin.example.com/${"경로".repeat(1600)}`,
+      draft: "가".repeat(12000),
+    });
+    const sectionTexts = getSectionTexts(message);
+    assert.equal(sectionTexts.every((text) => text.length <= 3000), true);
+    assert.equal(sectionTexts.every((text) => !text.includes("경로")), true);
+    assert.equal(sectionTexts.some((text) => text.includes("https://admin.example.com/admin/inquiries/")), true);
   });
 
   it("rejects non-2xx webhooks without exposing the URL", async () => {
