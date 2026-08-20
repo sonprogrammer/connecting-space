@@ -4,9 +4,9 @@
 
 **Goal:** Build the backend foundation that atomically accepts inquiries, generates grounded AI reply drafts, stores them, and sends retryable privacy-minimized Slack notifications.
 
-**Architecture:** Supabase PostgreSQL owns the durable job queue, locking, idempotency, and RLS boundaries. Next.js Route Handlers expose public/admin/internal contracts, while focused server modules call OpenAI Responses API and Slack Incoming Webhooks through dependency-injected fetch clients. `POST /api/inquiries` commits the inquiry and first job through one service-role RPC, returns `201`, then invokes one best-effort worker pass with Next.js `after()`.
+**Architecture:** Supabase PostgreSQL owns the durable job queue, locking, idempotency, and RLS boundaries. Next.js Route Handlers expose public/admin/internal contracts, while focused server modules call an environment-selected OpenAI-compatible AI provider and Slack Incoming Webhooks through dependency-injected fetch clients. `POST /api/inquiries` commits the inquiry and first job through one service-role RPC, returns `201`, then invokes one best-effort worker pass with Next.js `after()`.
 
-**Tech Stack:** Next.js 16.2.11 Route Handlers and `after()`, TypeScript 5, Zod 4, Supabase JS 2, PostgreSQL migrations/RLS/functions, OpenAI Responses API structured outputs, Slack Incoming Webhooks, Node test runner.
+**Tech Stack:** Next.js 16.2.11 Route Handlers and `after()`, TypeScript 5, Zod 4, Supabase JS 2, PostgreSQL migrations/RLS/functions, OpenAI-compatible Chat Completions structured outputs (Groq default; Gemini/OpenAI/custom supported), Slack Incoming Webhooks, Node test runner.
 
 **Spec:** `docs/superpowers/specs/2026-08-17-inquiry-ai-slack-automation-design.md`
 
@@ -64,22 +64,22 @@
 
 **Files:**
 - Create: `src/entities/automation/model/reply.ts`
-- Create: `src/shared/lib/automation/openai.ts`
+- Create: `src/shared/lib/automation/ai.ts`
 - Create: `src/shared/lib/automation/slack.ts`
 - Modify: `src/shared/config/env.ts`
 - Modify: `.env.example`
-- Test: `tests/automation-openai.test.ts`
+- Test: `tests/automation-core.test.ts`
 - Test: `tests/automation-slack.test.ts`
 - Test: `tests/automation-env.test.ts`
 
 **Interfaces:**
 - Produces: `generateInquiryReply(input, options)`, `buildInquiryReplyPrompt(input)`, `buildSlackMessage(input)`, `sendSlackNotification(input, options)`, and `assertAutomationEnv()`.
 
-- [ ] Write failing tests that require strict `summary`, `draft`, and `needsConfirmation` validation; `store: false`; JSON Schema structured output; DB-only grounding rules; and safe API error summaries.
-- [ ] Implement the OpenAI Responses API client with injected `fetch`, extract `output_text`, validate through Zod, and return usage/model metadata.
+- [ ] Write failing tests that require strict `summary`, `draft`, and `needsConfirmation` validation; JSON Schema structured output; DB-only grounding rules; provider presets; and safe API error summaries.
+- [ ] Implement the provider-neutral Chat Completions client with injected `fetch`, validate structured output through Zod, and return provider/usage/model metadata.
 - [ ] Write failing tests proving Slack blocks include only allowed customer/business fields and never include email, phone, full inquiry text, or webhook URL; require non-2xx responses to fail safely.
 - [ ] Implement Slack block/message construction and webhook sending with injected `fetch`.
-- [ ] Add exact environment validation for `OPENAI_API_KEY`, `OPENAI_INQUIRY_REPLY_MODEL`, `SLACK_INQUIRY_WEBHOOK_URL`, `AUTOMATION_PROCESS_SECRET`, and `ADMIN_BASE_URL`, and document names without values.
+- [ ] Add exact environment validation for `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`, optional `AI_BASE_URL`, `SLACK_INQUIRY_WEBHOOK_URL`, `AUTOMATION_PROCESS_SECRET`, and `ADMIN_BASE_URL`, and document names without values.
 - [ ] Run targeted and full tests.
 
 ### Task 4: Durable automation worker
@@ -149,4 +149,4 @@
 - [ ] Review the diff against every issue #26 completion condition and scan for secrets, frontend changes, unsafe error leakage, and missing tests.
 - [ ] Run fresh `npm run lint`, `npm run type-check`, `npm test`, and `npm run build` commands and record exact outcomes.
 - [ ] Commit focused changes, push the branch, and create the PR with first line exactly `[Back Agent / 백엔드 에이전트]`.
-- [ ] In the PR body document migration/environment names, normal flow, OpenAI failure, Slack failure, lock expiry, duplicate execution, and remote DB application evidence; include `Closes #26`.
+- [ ] In the PR body document migration/environment names, normal flow, AI provider failure, Slack failure, lock expiry, duplicate execution, and remote DB application evidence; include `Closes #26`.

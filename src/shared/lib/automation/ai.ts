@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export const aiProviderSchema = z.enum(["groq", "gemini", "openai", "custom"]);
+export type AiProvider = z.infer<typeof aiProviderSchema>;
+
 export const inquiryReplyResultSchema = z.object({
   summary: z.string().trim().min(1).max(2000),
   draft: z.string().trim().min(1).max(12000),
@@ -16,6 +19,31 @@ type ReplyInput = {
   faqs: unknown[];
 };
 
+export type AiProviderConfig = {
+  provider: AiProvider;
+  apiKey: string;
+  model: string;
+  baseUrl: string;
+};
+
+const providerBaseUrls: Record<Exclude<AiProvider, "custom">, string> = {
+  groq: "https://api.groq.com/openai/v1",
+  gemini: "https://generativelanguage.googleapis.com/v1beta/openai",
+  openai: "https://api.openai.com/v1",
+};
+
+export function resolveAiProviderConfig(input: {
+  provider: AiProvider;
+  apiKey: string;
+  model: string;
+  baseUrl?: string;
+}): AiProviderConfig {
+  const customBaseUrl = input.baseUrl?.trim().replace(/\/$/, "");
+  const baseUrl = input.provider === "custom" ? customBaseUrl : providerBaseUrls[input.provider];
+  if (!baseUrl) throw new Error("AI_BASE_URL is required for the custom AI provider");
+  return { provider: input.provider, apiKey: input.apiKey, model: input.model, baseUrl };
+}
+
 export function buildInquiryReplyPrompt(input: ReplyInput) {
   return [
     "다음 문의에 대한 정중한 한국어 답변 초안을 작성하세요.",
@@ -30,16 +58,17 @@ export function buildInquiryReplyPrompt(input: ReplyInput) {
 
 export async function generateInquiryReply(
   input: ReplyInput,
-  options: { apiKey: string; model: string; fetch?: typeof fetch },
+  options: AiProviderConfig & { fetch?: typeof fetch },
 ) {
   const fetcher = options.fetch ?? fetch;
-  const response = await fetcher("https://api.openai.com/v1/responses", {
+  const prompt = buildInquiryReplyPrompt(input);
+  const response = await fetcher(`${options.baseUrl}/chat/completions`, {
     method: "POST",
     headers: { Authorization: `Bearer ${options.apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: options.model, store: false,
-      input: [{ role: "user", content: buildInquiryReplyPrompt(input) }],
-      text: { format: { type: "json_schema", name: "inquiry_reply", strict: true, schema: {
+      model: options.model,
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_schema", json_schema: { name: "inquiry_reply", strict: true, schema: {
         type: "object", additionalProperties: false,
         properties: {
           summary: { type: "string" }, draft: { type: "string" },
@@ -50,15 +79,20 @@ export async function generateInquiryReply(
       } } },
     }),
   });
-  if (!response.ok) throw new Error(`OpenAI response failed (${response.status})`);
+  if (!response.ok) throw new Error(`AI provider response failed (${response.status})`);
   const payload = await response.json() as {
-    output_text?: string; model?: string; usage?: { input_tokens?: number; output_tokens?: number };
-    output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
+    model?: string;
+    choices?: Array<{ message?: { content?: string | null } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
-  const outputText = payload.output_text ?? payload.output?.flatMap((item) => item.content ?? [])
-    .find((content) => content.type === "output_text")?.text;
-  if (!outputText) throw new Error("OpenAI response did not contain structured output");
-  return { ...inquiryReplyResultSchema.parse(JSON.parse(outputText)), model: payload.model ?? options.model,
-    inputTokens: payload.usage?.input_tokens ?? null, outputTokens: payload.usage?.output_tokens ?? null,
-    prompt: buildInquiryReplyPrompt(input) };
+  const outputText = payload.choices?.[0]?.message?.content;
+  if (!outputText) throw new Error("AI provider response did not contain structured output");
+  return {
+    ...inquiryReplyResultSchema.parse(JSON.parse(outputText)),
+    provider: options.provider,
+    model: payload.model ?? options.model,
+    inputTokens: payload.usage?.prompt_tokens ?? null,
+    outputTokens: payload.usage?.completion_tokens ?? null,
+    prompt,
+  };
 }

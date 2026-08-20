@@ -8,7 +8,8 @@ import {
 import {
   generateInquiryReply,
   inquiryReplyResultSchema,
-} from "../src/shared/lib/automation/openai";
+  resolveAiProviderConfig,
+} from "../src/shared/lib/automation/ai";
 import { buildSlackMessage, sendSlackNotification } from "../src/shared/lib/automation/slack";
 import { nextFailureState, redactAutomationError } from "../src/shared/lib/automation/errors";
 
@@ -31,19 +32,31 @@ describe("automation content schemas", () => {
   });
 });
 
-describe("OpenAI inquiry reply", () => {
-  it("validates the strict reply shape and sends structured output with no storage", async () => {
+describe("provider-neutral AI inquiry reply", () => {
+  it("resolves provider presets without changing application code", () => {
+    assert.equal(resolveAiProviderConfig({ provider: "groq", apiKey: "key", model: "model" }).baseUrl, "https://api.groq.com/openai/v1");
+    assert.equal(resolveAiProviderConfig({ provider: "gemini", apiKey: "key", model: "model" }).baseUrl, "https://generativelanguage.googleapis.com/v1beta/openai");
+    assert.equal(resolveAiProviderConfig({ provider: "openai", apiKey: "key", model: "model" }).baseUrl, "https://api.openai.com/v1");
+    assert.equal(resolveAiProviderConfig({ provider: "custom", apiKey: "key", model: "model", baseUrl: "https://ai.example.com/v1/" }).baseUrl, "https://ai.example.com/v1");
+    assert.throws(() => resolveAiProviderConfig({ provider: "custom", apiKey: "key", model: "model" }));
+  });
+
+  it("sends a portable chat-completions JSON schema request", async () => {
     assert.equal(inquiryReplyResultSchema.safeParse({ summary: "요약", draft: "초안", needsConfirmation: [] }).success, true);
     let requestBody: Record<string, unknown> = {};
+    let requestUrl = "";
     const result = await generateInquiryReply(
       { inquiry: { customerName: "김고객", serviceType: "landing", message: "제작 문의 내용입니다." }, offerings: [], faqs: [] },
-      { apiKey: "secret", model: "test-model", fetch: async (_url, init) => {
+      { ...resolveAiProviderConfig({ provider: "groq", apiKey: "secret", model: "test-model" }), fetch: async (url, init) => {
+        requestUrl = String(url);
         requestBody = JSON.parse(String(init?.body));
-        return new Response(JSON.stringify({ model: "test-model", output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify({ summary: "요약", draft: "초안", needsConfirmation: [] }) }] }], usage: { input_tokens: 2, output_tokens: 3 } }));
+        return new Response(JSON.stringify({ model: "test-model", choices: [{ message: { content: JSON.stringify({ summary: "요약", draft: "초안", needsConfirmation: [] }) } }], usage: { prompt_tokens: 2, completion_tokens: 3 } }));
       } },
     );
-    assert.equal(requestBody.store, false);
-    assert.equal((requestBody.text as { format: { type: string } }).format.type, "json_schema");
+    assert.equal(requestUrl, "https://api.groq.com/openai/v1/chat/completions");
+    assert.equal((requestBody.response_format as { type: string }).type, "json_schema");
+    assert.equal((requestBody.response_format as { json_schema: { strict: boolean } }).json_schema.strict, true);
+    assert.equal(result.provider, "groq");
     assert.equal(result.summary, "요약");
   });
 });

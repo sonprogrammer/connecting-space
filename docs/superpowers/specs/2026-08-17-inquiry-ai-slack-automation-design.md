@@ -38,7 +38,7 @@ DB 작업 큐와 아웃박스를 사용한다.
   -> 고객에게 201 즉시 반환
   -> after()에서 처리기 호출
       -> 공개된 서비스/가격/FAQ 조회
-      -> OpenAI로 구조화된 답변 생성
+      -> 설정된 AI 공급자로 구조화된 답변 생성
       -> 현재 초안 + 생성 이력 저장
       -> Slack 전송 작업 생성 및 실행
       -> 성공 상태 저장
@@ -111,7 +111,7 @@ Slack 전송 결과를 운영 기록으로 남긴다.
 - `status`, `attempt_count`, `last_error`, `sent_at`
 - `created_at`, `updated_at`
 
-Webhook URL과 OpenAI API 키는 DB와 Git에 저장하지 않고 서버 환경변수로만 관리한다.
+Webhook URL과 AI API 키는 DB와 Git에 저장하지 않고 서버 환경변수로만 관리한다.
 
 ## RLS와 권한
 
@@ -123,7 +123,7 @@ Webhook URL과 OpenAI API 키는 DB와 Git에 저장하지 않고 서버 환경�
 
 ## AI 생성 규칙
 
-서버는 문의, 공개된 서비스 정보, 공개된 FAQ를 입력으로 조합한다. OpenAI 응답은 다음 구조를 강제한다.
+서버는 문의, 공개된 서비스 정보, 공개된 FAQ를 입력으로 조합한다. AI 공급자 응답은 다음 구조를 강제한다.
 
 ```ts
 type InquiryReplyResult = {
@@ -147,6 +147,8 @@ type InquiryReplyResult = {
 
 구조 검증 실패나 API 오류도 생성 기록과 작업 오류에 남긴다. 원문 프롬프트를 저장할 때 비밀키는 포함하지 않는다.
 
+공급자 연동은 OpenAI 호환 Chat Completions 계약으로 캡슐화한다. 기본 운영값은 Groq이며 `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL`만 바꿔 Gemini 또는 OpenAI로 전환할 수 있다. 기타 호환 공급자는 `AI_PROVIDER=custom`과 `AI_BASE_URL`을 사용한다.
+
 ## API 설계
 
 ### 공개 문의 등록
@@ -156,7 +158,7 @@ type InquiryReplyResult = {
 - 기존 입력 검증을 유지한다.
 - service role만 실행할 수 있는 DB 함수로 문의와 `generate_inquiry_reply` 작업을 한 트랜잭션에 생성한다.
 - AI·Slack 완료를 기다리지 않고 `201`을 반환한다.
-- DB 트랜잭션이 성공하면 문의와 최초 작업이 반드시 함께 존재한다. OpenAI 또는 Slack 실행 실패는 이 트랜잭션과 문의 응답에 영향을 주지 않는다.
+- DB 트랜잭션이 성공하면 문의와 최초 작업이 반드시 함께 존재한다. AI 공급자 또는 Slack 실행 실패는 이 트랜잭션과 문의 응답에 영향을 주지 않는다.
 - 응답 직후 `after()`로 해당 작업의 첫 처리를 시도한다.
 
 ### 공개 가격·FAQ 조회
@@ -230,7 +232,7 @@ Slack Incoming Webhook의 HTTP 상태를 검사하고 응답 본문 전체나 We
 - AI 최종 실패 시 초안 상태를 `failed`로 표시하고 재생성 버튼을 제공한다.
 - Slack 최종 실패 시 저장된 초안은 유지하고 수동 재전송 버튼을 제공한다.
 - 한 작업을 여러 실행기가 동시에 가져가도 중복 처리되지 않도록 DB 잠금과 멱등성 검사를 사용한다.
-- 오류 메시지에는 OpenAI 키, Supabase service role key, Slack Webhook URL, 고객 연락처를 넣지 않는다.
+- 오류 메시지에는 AI API 키, Supabase service role key, Slack Webhook URL, 고객 연락처를 넣지 않는다.
 
 ## 테스트와 검증
 
@@ -256,7 +258,7 @@ Front PR에서 확인한다.
 최종 QA에서 확인한다.
 
 - 실제 문의 등록부터 AI 초안 DB 저장, 관리자 표시, Slack 수신까지 전체 흐름
-- OpenAI 장애와 Slack 장애를 각각 모의한 재시도 및 최종 실패 표시
+- AI 공급자 장애와 Slack 장애를 각각 모의한 재시도 및 최종 실패 표시
 - 같은 작업의 중복 초안·중복 Slack 알림 방지
 - 가격·FAQ를 관리 화면에서 바꾸면 공개 홈과 이후 AI 답변에 함께 반영됨
 - Slack에 이메일·전화번호·문의 원문 전체가 포함되지 않음
@@ -264,7 +266,7 @@ Front PR에서 확인한다.
 
 ## 구현 및 PR 순서
 
-1. Back: 마이그레이션, 데이터 계약, 공개/관리자 API, 작업 처리기, OpenAI·Slack 연동, 테스트를 구현한다.
+1. Back: 마이그레이션, 데이터 계약, 공개/관리자 API, 작업 처리기, 공급자 중립 AI·Slack 연동, 테스트를 구현한다.
 2. QA: Back PR의 스키마, RLS, 작업 상태 전이, 실패 복구, 개인정보 제한을 검증한다.
 3. Planner: Back PR을 검토하고 통과 시 병합한다.
 4. Front: 병합된 API 계약을 기준으로 공개 가격·FAQ와 관리자 관리/초안 UI를 구현한다.
@@ -277,8 +279,10 @@ Back과 Front가 API 계약 파일이나 같은 조립 파일을 동시에 수�
 ## 환경변수
 
 - 기존 Supabase 공개 URL/anon key/service role key
-- `OPENAI_API_KEY`
-- `OPENAI_INQUIRY_REPLY_MODEL`
+- `AI_PROVIDER`: `groq`, `gemini`, `openai`, `custom` 중 하나
+- `AI_API_KEY`
+- `AI_MODEL`
+- `AI_BASE_URL`: `custom` 공급자에서만 필수
 - `SLACK_INQUIRY_WEBHOOK_URL`
 - `AUTOMATION_PROCESS_SECRET`
 - `ADMIN_BASE_URL`: Slack 관리자 상세 링크 생성용 운영 URL

@@ -3,7 +3,7 @@ import { assertAutomationEnv } from "@/shared/config/env";
 import type { Database, Json } from "@/shared/types/database.generated";
 import { createSupabaseAdminClient } from "@/shared/lib/supabase/server";
 import { nextFailureState, redactAutomationError } from "./errors";
-import { generateInquiryReply } from "./openai";
+import { generateInquiryReply } from "./ai";
 import { sendSlackNotification } from "./slack";
 
 type Job = Database["public"]["Tables"]["automation_jobs"]["Row"];
@@ -32,8 +32,8 @@ async function failJob(client: Client, job: Job, error: unknown, now: Date) {
   if (updateError) throw new Error("Failed to record automation job failure");
   if (job.job_type === "generate_inquiry_reply") {
     await client.from("ai_generation_records").insert({
-      inquiry_id: job.inquiry_id, kind: "inquiry_reply", provider: "openai",
-      model: process.env.OPENAI_INQUIRY_REPLY_MODEL ?? "unconfigured", prompt: "",
+      inquiry_id: job.inquiry_id, kind: "inquiry_reply", provider: process.env.AI_PROVIDER ?? "unconfigured",
+      model: process.env.AI_MODEL ?? "unconfigured", prompt: "",
       error_message: safeError,
     });
   }
@@ -59,9 +59,9 @@ async function generateDraft(client: Client, job: Job, fetcher: typeof fetch | u
       serviceType: inquiry.service_type, budgetMin: inquiry.budget_min, budgetMax: inquiry.budget_max,
       desiredLaunchDate: inquiry.desired_launch_date, message: inquiry.message },
     offerings: offerings ?? [], faqs: faqs ?? [],
-  }, { apiKey: env.openaiApiKey, model: env.openaiModel, fetch: fetcher });
+  }, { ...env.ai, fetch: fetcher });
   const { data: record, error: recordError } = await client.from("ai_generation_records").insert({
-    inquiry_id: inquiry.id, kind: "inquiry_reply", provider: "openai", model: result.model,
+    inquiry_id: inquiry.id, kind: "inquiry_reply", provider: result.provider, model: result.model,
     prompt: result.prompt, output: JSON.stringify({ summary: result.summary, draft: result.draft, needsConfirmation: result.needsConfirmation }),
     input_tokens: result.inputTokens, output_tokens: result.outputTokens,
   }).select("id").single();
