@@ -23,6 +23,7 @@ import {
   getInquiryStatusLabel,
 } from "@/entities/inquiry";
 import { InquiryConversionPanel } from "@/features/convert-inquiry-to-project";
+import { InquiryReplyDraftPanel } from "@/features/manage-inquiry-reply";
 import { Button } from "@/shared/ui/button";
 import type { ApiResponse } from "@/shared/types/api";
 
@@ -570,6 +571,8 @@ function InquiryDetailForm({
             저장
           </Button>
         </div>
+
+        <InquiryReplyDraftPanel inquiryId={inquiry.id} />
 
         <InquiryConversionPanel inquiry={inquiry} onInquiryUpdated={onUpdated} />
       </div>
