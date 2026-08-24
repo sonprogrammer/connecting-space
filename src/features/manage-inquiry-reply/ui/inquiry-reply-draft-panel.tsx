@@ -11,6 +11,7 @@ import { getDraftStatusCopy, getReplyDraftFailure, getSlackDeliveryPresentation,
 type ViewState =
   | { status: "loading" }
   | { status: "missing" }
+  | { status: "generating" }
   | { status: "success"; draft: InquiryReplyDraft }
   | { status: "error"; message: string };
 
@@ -43,7 +44,7 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
       if (!response.ok || "error" in result) { setNotice({ tone: "error", text: "error" in result ? getReplyDraftFailure(response.status, result) : "요청을 처리하지 못했습니다." }); return; }
       if (kind === "regenerate") {
         setNotice({ tone: "success", text: "AI 초안 재생성을 요청했습니다." });
-        setState((current) => current.status === "success" ? { status: "success", draft: { ...current.draft, status: "generating", lastError: null } } : current);
+        setState((current) => current.status === "success" ? { status: "success", draft: { ...current.draft, status: "generating", lastError: null } } : { status: "generating" });
       } else {
         await load();
         setNotice({ tone: "success", text: "Slack 재전송을 요청했습니다." });
@@ -72,7 +73,8 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
 
   if (state.status === "loading") return <Panel><div role="status" className="flex min-h-40 items-center justify-center gap-2 text-sm text-[#617068]"><Loader2 aria-hidden className="size-5 animate-spin text-[#2e6f4f]" />AI 답변 초안을 불러오는 중입니다.</div></Panel>;
   if (state.status === "error") return <Panel><StatusBlock status="failed" message={state.message} action={<Button type="button" variant="outline" onClick={() => void load()}><RefreshCw aria-hidden />다시 불러오기</Button>} auth={state.message.startsWith("관리자 로그인이")} /></Panel>;
-  if (state.status === "missing") return <Panel><StatusBlock status="missing" action={<Button type="button" onClick={() => void requestAction("regenerate")} disabled={busy !== null}>{busy === "regenerate" ? <Loader2 aria-hidden className="animate-spin" /> : <Bot aria-hidden />}AI 초안 생성</Button>} /></Panel>;
+  if (state.status === "missing") return <Panel>{notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}<StatusBlock status="missing" action={<Button type="button" onClick={() => void requestAction("regenerate")} disabled={busy !== null}>{busy === "regenerate" ? <Loader2 aria-hidden className="animate-spin" /> : <Bot aria-hidden />}AI 초안 생성</Button>} /></Panel>;
+  if (state.status === "generating") return <Panel>{notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}<StatusBlock status="generating" action={<Button type="button" variant="outline" onClick={() => void load()}><RefreshCw aria-hidden />상태 새로고침</Button>} /></Panel>;
 
   const draft = state.draft;
   const status = getDraftStatusCopy(draft.status);
@@ -96,5 +98,5 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
 
 function Panel({ children }: Readonly<{ children: React.ReactNode }>) { return <section className="rounded-md border border-[#dfe3dc] bg-[#fbfcf9] p-4 sm:p-5">{children}</section>; }
 function StatusBlock({ status, message, action, auth }: Readonly<{ status: DraftViewStatus; message?: string; action: React.ReactNode; auth?: boolean }>) { const copy = getDraftStatusCopy(status); return <div className="flex min-h-44 flex-col items-center justify-center text-center"><Bot aria-hidden className="size-8 text-[#2e6f4f]" /><h3 className="mt-3 font-semibold">{copy.title}</h3><p className="mt-2 max-w-lg text-sm leading-6 text-[#617068]">{message || copy.description}</p>{auth ? <a href="/admin/login?next=/admin" className="mt-3 text-sm font-semibold underline">로그인하기</a> : <div className="mt-4">{action}</div>}</div>; }
-function Notice({ tone, children }: Readonly<{ tone: "success" | "error"; children: React.ReactNode }>) { return <div role={tone === "error" ? "alert" : "status"} className={`mt-5 flex gap-2 rounded-md p-3 text-sm ${tone === "error" ? "bg-[#fff1ee] text-[#912018]" : "bg-[#edf7f0] text-[#23583f]"}`}>{tone === "error" ? <AlertCircle aria-hidden className="mt-0.5 size-4 shrink-0" /> : <Check aria-hidden className="mt-0.5 size-4 shrink-0" />}{children}</div>; }
+function Notice({ tone, children }: Readonly<{ tone: "success" | "error"; children: React.ReactNode }>) { const auth = typeof children === "string" && children.startsWith("관리자 로그인이"); return <div role={tone === "error" ? "alert" : "status"} className={`mt-5 flex gap-2 rounded-md p-3 text-sm ${tone === "error" ? "bg-[#fff1ee] text-[#912018]" : "bg-[#edf7f0] text-[#23583f]"}`}>{tone === "error" ? <AlertCircle aria-hidden className="mt-0.5 size-4 shrink-0" /> : <Check aria-hidden className="mt-0.5 size-4 shrink-0" />}<span>{children}{auth ? <a href="/admin/login?next=/admin" className="ml-2 font-semibold underline">로그인하기</a> : null}</span></div>; }
 function formatDateTime(value: string) { return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Seoul" }).format(new Date(value)); }

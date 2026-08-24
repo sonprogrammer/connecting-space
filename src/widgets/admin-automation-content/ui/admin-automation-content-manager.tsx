@@ -17,13 +17,17 @@ type EditorMode = { type: "create" } | { type: "edit"; id: string };
 
 export function AdminAutomationContentManager() {
   const [tab, setTab] = useState<"services" | "faqs">("services");
+  function activateTab(nextTab: "services" | "faqs", id: string) {
+    setTab(nextTab);
+    queueMicrotask(() => document.getElementById(id)?.focus());
+  }
   return (
     <section className="overflow-hidden rounded-lg border border-[#dfe3dc] bg-white">
       <header className="border-b border-[#e8ebe5] p-5">
         <div className="flex items-center gap-3"><span className="flex size-10 items-center justify-center rounded-md bg-[#17201a] text-white"><Settings2 aria-hidden className="size-5" /></span><div><h2 className="text-lg font-semibold">서비스·FAQ 관리</h2><p className="text-sm text-[#617068]">공개 홈과 AI 답변에 사용하는 운영 기준을 관리합니다.</p></div></div>
         <div className="mt-5 flex gap-2" role="tablist" aria-label="콘텐츠 종류">
-          <Tab active={tab === "services"} onClick={() => setTab("services")} id="services-tab" controls="services-panel">서비스·가격</Tab>
-          <Tab active={tab === "faqs"} onClick={() => setTab("faqs")} id="faqs-tab" controls="faqs-panel">FAQ</Tab>
+          <Tab active={tab === "services"} onClick={() => setTab("services")} onKeyDown={(event) => { if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); activateTab("faqs", "faqs-tab"); } }} id="services-tab" controls="services-panel">서비스·가격</Tab>
+          <Tab active={tab === "faqs"} onClick={() => setTab("faqs")} onKeyDown={(event) => { if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); activateTab("services", "services-tab"); } }} id="faqs-tab" controls="faqs-panel">FAQ</Tab>
         </div>
       </header>
       {tab === "services" ? <ServiceManager /> : <FaqManager />}
@@ -31,8 +35,8 @@ export function AdminAutomationContentManager() {
   );
 }
 
-function Tab({ active, onClick, id, controls, children }: Readonly<{ active: boolean; onClick: () => void; id: string; controls: string; children: React.ReactNode }>) {
-  return <button type="button" role="tab" id={id} aria-controls={controls} aria-selected={active} onClick={onClick} className={`rounded-md px-4 py-2 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-[#2e6f4f]/25 ${active ? "bg-[#17201a] text-white" : "border border-[#dfe3dc] text-[#526057] hover:bg-[#f5f6f3]"}`}>{children}</button>;
+function Tab({ active, onClick, onKeyDown, id, controls, children }: Readonly<{ active: boolean; onClick: () => void; onKeyDown: React.KeyboardEventHandler<HTMLButtonElement>; id: string; controls: string; children: React.ReactNode }>) {
+  return <button type="button" role="tab" id={id} aria-controls={controls} aria-selected={active} tabIndex={active ? 0 : -1} onClick={onClick} onKeyDown={onKeyDown} className={`rounded-md px-4 py-2 text-sm font-semibold outline-none focus-visible:ring-3 focus-visible:ring-[#2e6f4f]/25 ${active ? "bg-[#17201a] text-white" : "border border-[#dfe3dc] text-[#526057] hover:bg-[#f5f6f3]"}`}>{children}</button>;
 }
 
 function ServiceManager() {
