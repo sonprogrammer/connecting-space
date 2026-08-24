@@ -6,6 +6,27 @@ export type ServiceInput = z.infer<typeof createServiceOfferingSchema> | z.infer
 export type FaqInput = z.infer<typeof createFaqSchema> | z.infer<typeof updateFaqSchema>;
 type ServiceRow = Database["public"]["Tables"]["service_offerings"]["Row"];
 type FaqRow = Database["public"]["Tables"]["faq_items"]["Row"];
+type ReplyDraftRow = Database["public"]["Tables"]["inquiry_reply_drafts"]["Row"];
+type NotificationDeliveryRow = Database["public"]["Tables"]["notification_deliveries"]["Row"];
+
+export type AdminInquiryReplyDraftResponse = {
+  id: string;
+  inquiryId: string;
+  generationRecordId: string | null;
+  generationRecord: {
+    id: string;
+    provider: string;
+    model: string;
+    createdAt: string;
+  } | null;
+  summary: string;
+  draft: string;
+  needsConfirmation: Json;
+  status: ReplyDraftRow["status"];
+  lastError: string | null;
+  updatedAt: string;
+  slackDelivery: NotificationDeliveryRow | null;
+};
 
 export function serviceInputToRow(input: ServiceInput) {
   return {

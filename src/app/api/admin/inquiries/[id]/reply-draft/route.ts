@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
+import type { AdminInquiryReplyDraftResponse } from "@/entities/automation/api/contracts";
 import { updateReplyDraftSchema } from "@/entities/automation/schemas/content.schema";
 import { jsonError, jsonOk } from "@/shared/api/response";
 import { getVerifiedAdminSupabase } from "@/shared/lib/auth/admin-api";
@@ -16,9 +17,18 @@ export async function GET(request: NextRequest, context: Context) {
   ]);
   if (error || deliveryError) return jsonError("REPLY_DRAFT_READ_FAILED", "Failed to read reply draft", 500);
   if (!draft) return jsonError("REPLY_DRAFT_NOT_FOUND", "Reply draft not found", 404);
-  return jsonOk({ id: draft.id, inquiryId: draft.inquiry_id, generationRecordId: draft.generation_record_id,
+  const { data: generationRecord, error: generationError } = draft.generation_record_id
+    ? await admin.supabase.from("ai_generation_records").select("provider,model,created_at")
+      .eq("id", draft.generation_record_id).maybeSingle()
+    : { data: null, error: null };
+  if (generationError) return jsonError("REPLY_DRAFT_READ_FAILED", "Failed to read reply draft", 500);
+  const response = { id: draft.id, inquiryId: draft.inquiry_id, generationRecordId: draft.generation_record_id,
+    generationRecord: draft.generation_record_id && generationRecord ? { id: draft.generation_record_id,
+      provider: generationRecord.provider, model: generationRecord.model, createdAt: generationRecord.created_at } : null,
     summary: draft.summary, draft: draft.draft_text, needsConfirmation: draft.needs_confirmation,
-    status: draft.status, lastError: draft.last_error, updatedAt: draft.updated_at, slackDelivery: deliveries?.[0] ?? null });
+    status: draft.status, lastError: draft.last_error, updatedAt: draft.updated_at,
+    slackDelivery: deliveries?.[0] ?? null } satisfies AdminInquiryReplyDraftResponse;
+  return jsonOk(response);
 }
 export async function PATCH(request: NextRequest, context: Context) {
   const id = await getId(context); if (!id.success) return jsonError("INVALID_INQUIRY_ID", "Invalid inquiry id", 400);
