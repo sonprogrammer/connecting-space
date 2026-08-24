@@ -1,3 +1,5 @@
+import type { AdminInquiryReplyDraftResponse } from "../api/contracts";
+
 export type ServiceOffering = {
   id: string;
   slug: string;
@@ -56,6 +58,7 @@ export type InquiryReplyDraft = {
   id: string;
   inquiryId: string;
   generationRecordId: string | null;
+  generationRecord: AdminInquiryReplyDraftResponse["generationRecord"];
   summary: string;
   draft: string;
   needsConfirmation: ConfirmationItem[];

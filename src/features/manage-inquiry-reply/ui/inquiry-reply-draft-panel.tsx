@@ -7,6 +7,7 @@ import type { InquiryReplyDraft } from "@/entities/automation";
 import type { ApiResponse } from "@/shared/types/api";
 import { Button } from "@/shared/ui/button";
 import { getDraftStatusCopy, getReplyDraftFailure, getSlackDeliveryPresentation, type DraftViewStatus } from "../model/reply-draft-state";
+import { ReplyDraftGenerationMetadata } from "./reply-draft-generation-metadata";
 
 type ViewState =
   | { status: "loading" }
@@ -91,7 +92,7 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
       <label className="grid gap-2 text-sm font-semibold text-[#526057]">답변 초안<textarea value={draftText} onChange={(event) => setDraftText(event.target.value)} maxLength={12000} rows={12} required disabled={busy !== null} className="resize-y rounded-md border border-[#dfe3dc] px-3 py-2 font-normal leading-6 text-[#17201a] outline-none focus:border-[#2e6f4f] focus:ring-3 focus:ring-[#2e6f4f]/15" /></label>
       <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={() => void requestAction("regenerate")} disabled={busy !== null}>{busy === "regenerate" ? <Loader2 aria-hidden className="animate-spin" /> : <RotateCcw aria-hidden />}재생성</Button><Button type="button" variant="outline" onClick={() => void copyDraft()} disabled={busy !== null || !draftText}><Clipboard aria-hidden />복사</Button><Button type="button" onClick={() => void save()} disabled={busy !== null || !draftText.trim()}>{busy === "save" ? <Loader2 aria-hidden className="animate-spin" /> : <Save aria-hidden />}초안 저장</Button></div>
     </div> : null}
-    <div className="mt-5 grid gap-3 rounded-md border border-[#e8ebe5] bg-[#fbfcf9] p-4 text-xs text-[#617068] sm:grid-cols-2"><p>마지막 갱신: <strong className="text-[#3c4941]">{formatDateTime(draft.updatedAt)}</strong></p><p>생성 기록: <strong className="break-all text-[#3c4941]">{draft.generationRecordId || "기록 없음"}</strong></p></div>
+    <div className="mt-5 grid gap-3 rounded-md border border-[#e8ebe5] bg-[#fbfcf9] p-4 text-xs text-[#617068] sm:grid-cols-2 xl:grid-cols-5"><p>마지막 갱신: <strong className="text-[#3c4941]">{formatDateTime(draft.updatedAt)}</strong></p><p>생성 기록: <strong className="break-all text-[#3c4941]">{draft.generationRecordId || "기록 없음"}</strong></p><ReplyDraftGenerationMetadata generationRecord={draft.generationRecord} /></div>
     <div className="mt-5 rounded-md border border-[#dfe3dc] p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h4 className="flex items-center gap-2 text-sm font-semibold"><Send aria-hidden className="size-4 text-[#2e6f4f]" />{slack.label}</h4><p className="mt-1 text-xs text-[#617068]">시도 {draft.slackDelivery?.attempt_count ?? 0}회{draft.slackDelivery?.sent_at ? ` · ${formatDateTime(draft.slackDelivery.sent_at)} 전송` : ""}</p></div>{slack.canRetry ? <Button type="button" variant="outline" onClick={() => void requestAction("slack")} disabled={busy !== null}>{busy === "slack" ? <Loader2 aria-hidden className="animate-spin" /> : <RotateCcw aria-hidden />}Slack 재전송</Button> : null}</div>{draft.slackDelivery?.last_error ? <p role="alert" className="mt-3 rounded bg-[#fff1ee] p-2 text-xs text-[#912018]">{draft.slackDelivery.last_error}</p> : null}</div>
   </Panel>;
 }
