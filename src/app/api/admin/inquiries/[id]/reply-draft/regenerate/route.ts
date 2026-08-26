@@ -1,8 +1,9 @@
-import type { NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 import { z } from "zod";
 import { jsonError, jsonOk } from "@/shared/api/response";
 import { getVerifiedAdminSupabase } from "@/shared/lib/auth/admin-api";
 import { createSupabaseAdminClient } from "@/shared/lib/supabase/server";
+import { processAutomationJobs } from "@/shared/lib/automation/processor";
 
 type Context = { params: Promise<{ id: string }> };
 export async function POST(request: NextRequest, context: Context) {
@@ -15,5 +16,8 @@ export async function POST(request: NextRequest, context: Context) {
   const { data: jobId, error: enqueueError } = await service.rpc("enqueue_automation_job", { p_inquiry_id: id.data, p_job_type: "generate_inquiry_reply", p_payload: { manual: true } });
   if (enqueueError) return jsonError("REPLY_REGENERATION_FAILED", "Failed to enqueue reply regeneration", 500);
   await service.from("inquiry_reply_drafts").upsert({ inquiry_id: id.data, status: "generating", last_error: null }, { onConflict: "inquiry_id" });
+  after(async () => {
+    await processAutomationJobs({ limit: 1 }).catch(() => undefined);
+  });
   return jsonOk({ jobId, status: "pending" }, { status: 202 });
 }

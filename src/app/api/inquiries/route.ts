@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import { createInquirySchema } from "@/features/submit-inquiry/schemas/inquiry.schema";
 import { jsonError, jsonOk } from "@/shared/api/response";
 import { createSupabaseAdminClient } from "@/shared/lib/supabase/server";
@@ -44,4 +45,3 @@ export async function POST(request: Request) {
   });
   return jsonOk({ id: created.id, status: created.status }, { status: 201 });
 }
-import { after } from "next/server";

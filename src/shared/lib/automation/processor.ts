@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { assertAutomationEnv } from "@/shared/config/env";
+import { assertAiEnv, assertSlackEnv } from "@/shared/config/env";
 import type { Database, Json } from "@/shared/types/database.generated";
 import { createSupabaseAdminClient } from "@/shared/lib/supabase/server";
 import { nextFailureState, redactAutomationError } from "./errors";
@@ -46,20 +46,22 @@ async function failJob(client: Client, job: Job, error: unknown, now: Date) {
 }
 
 async function generateDraft(client: Client, job: Job, fetcher: typeof fetch | undefined, now: Date) {
-  const env = assertAutomationEnv();
   const [{ data: inquiry, error: inquiryError }, { data: offerings, error: offeringError }, { data: faqs, error: faqError }] = await Promise.all([
     client.from("inquiries").select("*").eq("id", job.inquiry_id).maybeSingle(),
     client.from("service_offerings").select("*").eq("is_published", true).order("sort_order"),
     client.from("faq_items").select("*").eq("is_published", true).order("sort_order"),
   ]);
   if (inquiryError || !inquiry || offeringError || faqError) throw new Error("Failed to load inquiry automation context");
-  await client.from("inquiry_reply_drafts").upsert({ inquiry_id: inquiry.id, status: "generating", last_error: null }, { onConflict: "inquiry_id" });
+  const { error: generatingError } = await client.from("inquiry_reply_drafts")
+    .upsert({ inquiry_id: inquiry.id, status: "generating", last_error: null }, { onConflict: "inquiry_id" });
+  if (generatingError) throw new Error("Failed to initialize inquiry reply draft");
+  const ai = assertAiEnv();
   const result = await generateInquiryReply({
     inquiry: { customerName: inquiry.customer_name, companyName: inquiry.company_name, websiteUrl: inquiry.website_url,
       serviceType: inquiry.service_type, budgetMin: inquiry.budget_min, budgetMax: inquiry.budget_max,
       desiredLaunchDate: inquiry.desired_launch_date, message: inquiry.message },
     offerings: offerings ?? [], faqs: faqs ?? [],
-  }, { ...env.ai, fetch: fetcher });
+  }, { ...ai, fetch: fetcher });
   const { data: record, error: recordError } = await client.from("ai_generation_records").insert({
     inquiry_id: inquiry.id, kind: "inquiry_reply", provider: result.provider, model: result.model,
     prompt: result.prompt, output: JSON.stringify({ summary: result.summary, draft: result.draft, needsConfirmation: result.needsConfirmation }),
@@ -79,7 +81,6 @@ async function generateDraft(client: Client, job: Job, fetcher: typeof fetch | u
 }
 
 async function sendSlack(client: Client, job: Job, fetcher: typeof fetch | undefined, now: Date) {
-  const env = assertAutomationEnv();
   const [{ data: inquiry, error: inquiryError }, { data: draft, error: draftError }] = await Promise.all([
     client.from("inquiries").select("*").eq("id", job.inquiry_id).maybeSingle(),
     client.from("inquiry_reply_drafts").select("*").eq("inquiry_id", job.inquiry_id).eq("status", "ready").maybeSingle(),
@@ -93,6 +94,7 @@ async function sendSlack(client: Client, job: Job, fetcher: typeof fetch | undef
     inquiry_id: inquiry.id, draft_id: draft.id, channel: "slack", status: "processing", attempt_count: job.attempt_count, last_error: null,
   }, { onConflict: "draft_id,channel" }).select("id,status").single();
   if (deliveryError || !delivery) throw new Error("Failed to persist Slack delivery attempt");
+  const env = assertSlackEnv();
   const confirmations = Array.isArray(draft.needs_confirmation) ? draft.needs_confirmation : [];
   await sendSlackNotification({ inquiryId: inquiry.id, customerName: inquiry.customer_name, serviceType: inquiry.service_type,
     budget: budgetLabel(inquiry.budget_min, inquiry.budget_max), desiredLaunchDate: inquiry.desired_launch_date ?? "미정",
