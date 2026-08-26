@@ -128,7 +128,48 @@ describe("automation job processor", () => {
     assert.equal(fake.jobHasStatus("retry"), true);
     assert.equal(fake.wroteDraft(), false);
   });
+
+  test("claims only the requested job id for manual processing", async () => {
+    const fake = createDirectClaimSupabase();
+    const results = await processor.processAutomationJobs({
+      jobId,
+      dependencies: { client: fake.client },
+    });
+
+    assert.deepEqual(results, []);
+    assert.equal(fake.requestedRpc("claim_automation_job_by_id"), true);
+    assert.equal(fake.requestedRpc("claim_automation_jobs"), false);
+    assert.equal(fake.claimedJobId(), jobId);
+  });
 });
+
+function createDirectClaimSupabase() {
+  const requests: Array<{ request: Request; body: string }> = [];
+  const fetchStub: typeof fetch = async (input, init) => {
+    const request = new Request(input, init);
+    const body = await request.clone().text();
+    requests.push({ request: request.clone(), body });
+    const resource = new URL(request.url).pathname.split("/").at(-1);
+    if (request.method === "POST" && ["claim_automation_job_by_id", "claim_automation_jobs"].includes(resource ?? "")) {
+      return jsonResponse([]);
+    }
+    throw new Error(`Unexpected database request: ${request.method} ${request.url}`);
+  };
+  const client = createClient<Database>("http://supabase.test", "service-key", {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: fetchStub },
+  });
+  return {
+    client: client as SupabaseClient<Database>,
+    requestedRpc: (name: string) => requests.some(({ request }) =>
+      new URL(request.url).pathname.endsWith(`/${name}`)),
+    claimedJobId: () => {
+      const claim = requests.find(({ request }) =>
+        new URL(request.url).pathname.endsWith("/claim_automation_job_by_id"));
+      return claim ? (JSON.parse(claim.body) as { p_job_id?: string }).p_job_id : undefined;
+    },
+  };
+}
 
 function createProcessorSupabase() {
   const requests: Array<{ request: Request; body: string }> = [];

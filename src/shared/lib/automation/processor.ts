@@ -119,10 +119,12 @@ export async function processAutomationJob(job: Job, dependencies: Dependencies 
   }
 }
 
-export async function processAutomationJobs(options: { limit?: number; workerId?: string; dependencies?: Dependencies } = {}) {
+export async function processAutomationJobs(options: { limit?: number; workerId?: string; jobId?: string; dependencies?: Dependencies } = {}) {
   const client = options.dependencies?.client ?? createSupabaseAdminClient();
   const workerId = options.workerId ?? `next-${crypto.randomUUID()}`;
-  const { data: jobs, error } = await client.rpc("claim_automation_jobs", { p_worker_id: workerId, p_limit: Math.max(1, Math.min(options.limit ?? 5, 20)) });
+  const { data: jobs, error } = options.jobId
+    ? await client.rpc("claim_automation_job_by_id", { p_job_id: options.jobId, p_worker_id: workerId })
+    : await client.rpc("claim_automation_jobs", { p_worker_id: workerId, p_limit: Math.max(1, Math.min(options.limit ?? 5, 20)) });
   if (error) throw new Error("Failed to claim automation jobs");
   return Promise.all((jobs ?? []).map((job) => processAutomationJob(job, { ...options.dependencies, client })));
 }
