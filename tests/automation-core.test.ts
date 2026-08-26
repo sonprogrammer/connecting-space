@@ -12,6 +12,41 @@ import {
 } from "../src/shared/lib/automation/ai";
 import { buildSlackMessage, sendSlackNotification } from "../src/shared/lib/automation/slack";
 import { nextFailureState, redactAutomationError } from "../src/shared/lib/automation/errors";
+import {
+  assertAiEnv,
+  assertAutomationProcessEnv,
+  assertSlackEnv,
+} from "../src/shared/config/env";
+
+const automationEnvNames = [
+  "AI_PROVIDER",
+  "AI_API_KEY",
+  "AI_MODEL",
+  "AI_BASE_URL",
+  "SLACK_INQUIRY_WEBHOOK_URL",
+  "AUTOMATION_PROCESS_SECRET",
+  "ADMIN_BASE_URL",
+] as const;
+
+function withAutomationEnv(
+  values: Partial<Record<(typeof automationEnvNames)[number], string>>,
+  assertion: () => void,
+) {
+  const previous = Object.fromEntries(
+    automationEnvNames.map((name) => [name, process.env[name]]),
+  );
+  try {
+    for (const name of automationEnvNames) delete process.env[name];
+    Object.assign(process.env, values);
+    assertion();
+  } finally {
+    for (const name of automationEnvNames) {
+      const value = previous[name];
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+}
 
 describe("automation content schemas", () => {
   it("normalizes an offering and rejects inverted prices", () => {
@@ -33,6 +68,35 @@ describe("automation content schemas", () => {
 });
 
 describe("provider-neutral AI inquiry reply", () => {
+  it("validates AI, Slack, and worker credentials independently", () => {
+    withAutomationEnv({
+      AI_PROVIDER: "openai",
+      AI_API_KEY: "test-key",
+      AI_MODEL: "test-model",
+    }, () => {
+      assert.equal(assertAiEnv().provider, "openai");
+      assert.throws(() => assertSlackEnv(), /SLACK_INQUIRY_WEBHOOK_URL/);
+      assert.throws(() => assertAutomationProcessEnv(), /AUTOMATION_PROCESS_SECRET/);
+    });
+
+    withAutomationEnv({
+      SLACK_INQUIRY_WEBHOOK_URL: "https://hooks.slack.test/example",
+      ADMIN_BASE_URL: "https://admin.example.com",
+    }, () => {
+      assert.deepEqual(assertSlackEnv(), {
+        slackWebhookUrl: "https://hooks.slack.test/example",
+        adminBaseUrl: "https://admin.example.com",
+      });
+      assert.throws(() => assertAiEnv(), /AI_PROVIDER/);
+    });
+
+    withAutomationEnv({ AUTOMATION_PROCESS_SECRET: "worker-secret" }, () => {
+      assert.deepEqual(assertAutomationProcessEnv(), { processSecret: "worker-secret" });
+      assert.throws(() => assertAiEnv(), /AI_PROVIDER/);
+      assert.throws(() => assertSlackEnv(), /SLACK_INQUIRY_WEBHOOK_URL/);
+    });
+  });
+
   it("resolves provider presets without changing application code", () => {
     assert.equal(resolveAiProviderConfig({ provider: "groq", apiKey: "key", model: "model" }).baseUrl, "https://api.groq.com/openai/v1");
     assert.equal(resolveAiProviderConfig({ provider: "gemini", apiKey: "key", model: "model" }).baseUrl, "https://generativelanguage.googleapis.com/v1beta/openai");

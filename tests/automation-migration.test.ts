@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
@@ -10,6 +10,10 @@ const migrationPath = join(
 const recoveryMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202608200002_finalize_exhausted_automation_locks.sql",
+);
+const manualRequeueMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202608260001_requeue_manual_automation_jobs.sql",
 );
 
 describe("inquiry automation migration", () => {
@@ -53,5 +57,22 @@ describe("inquiry automation migration", () => {
     assert.match(sql, /notification_deliveries/);
     assert.match(sql, /returning drafts\.inquiry_id/);
     assert.match(sql, /returning deliveries\.inquiry_id/);
+  });
+
+  it("atomically requeues manual work and claims only its job id", () => {
+    assert.equal(existsSync(manualRequeueMigrationPath), true, "manual requeue migration must exist");
+    const sql = readFileSync(manualRequeueMigrationPath, "utf8").toLowerCase();
+
+    assert.match(sql, /create or replace function public\.requeue_automation_job/);
+    assert.match(sql, /status in \('pending', 'retry'\)/);
+    assert.match(sql, /status = 'processing'/);
+    assert.match(sql, /available_at = p_now/);
+    assert.match(sql, /locked_at = null/);
+    assert.match(sql, /locked_by = null/);
+    assert.match(sql, /last_error = null/);
+    assert.match(sql, /create or replace function public\.claim_automation_job_by_id/);
+    assert.match(sql, /jobs\.id = p_job_id/);
+    assert.match(sql, /grant execute on function public\.requeue_automation_job/);
+    assert.match(sql, /grant execute on function public\.claim_automation_job_by_id/);
   });
 });
