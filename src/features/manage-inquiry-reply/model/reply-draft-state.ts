@@ -1,3 +1,4 @@
+import type { InquiryReplyDraft } from "../../../entities/automation";
 import type { ApiFailure } from "../../../shared/types/api";
 
 export type DraftViewStatus = "missing" | "generating" | "ready" | "failed";
@@ -31,4 +32,13 @@ export function getReplyDraftFailure(status: number, result: ApiFailure) {
   if (status === 401 || status === 403) return "관리자 로그인이 만료되었습니다. 다시 로그인해 주세요.";
   if (result.error.code === "VALIDATION_ERROR") return "답변 초안을 확인해 주세요.";
   return "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+}
+
+export function markReplyDraftRegenerationPending(draft: InquiryReplyDraft): InquiryReplyDraft {
+  return {
+    ...draft,
+    status: "generating",
+    lastError: null,
+    generationJob: null,
+  };
 }

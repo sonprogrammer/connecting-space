@@ -5,6 +5,7 @@ import {
   getDraftStatusCopy,
   getReplyDraftFailure,
   getSlackDeliveryPresentation,
+  markReplyDraftRegenerationPending,
 } from "../src/features/manage-inquiry-reply/model/reply-draft-state";
 
 describe("inquiry reply draft state", () => {
@@ -32,5 +33,38 @@ describe("inquiry reply draft state", () => {
     assert.equal(getReplyDraftFailure(400, {
       error: { code: "VALIDATION_ERROR", message: "invalid" },
     }), "답변 초안을 확인해 주세요.");
+  });
+
+  test("clears the previous generation job when regeneration starts", () => {
+    const pending = markReplyDraftRegenerationPending({
+      id: "draft-1",
+      inquiryId: "inquiry-1",
+      generationRecordId: "record-1",
+      generationRecord: {
+        id: "record-1",
+        provider: "openai",
+        model: "gpt-4.1-mini",
+        createdAt: "2026-08-29T00:00:00.000Z",
+      },
+      summary: "문의 요약",
+      draft: "답변 초안",
+      needsConfirmation: [],
+      status: "failed",
+      lastError: "previous failure",
+      updatedAt: "2026-08-29T00:00:00.000Z",
+      generationJob: {
+        id: "old-job",
+        status: "failed",
+        attemptCount: 3,
+        maxAttempts: 3,
+        availableAt: null,
+        lastError: "previous failure",
+      },
+      slackDelivery: null,
+    });
+
+    assert.equal(pending.status, "generating");
+    assert.equal(pending.lastError, null);
+    assert.equal(pending.generationJob, null);
   });
 });

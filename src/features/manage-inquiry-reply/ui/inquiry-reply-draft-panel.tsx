@@ -6,7 +6,8 @@ import { AlertCircle, Bot, Check, Clipboard, Loader2, RefreshCw, RotateCcw, Save
 import type { InquiryReplyDraft } from "@/entities/automation";
 import type { ApiResponse } from "@/shared/types/api";
 import { Button } from "@/shared/ui/button";
-import { getDraftStatusCopy, getReplyDraftFailure, getSlackDeliveryPresentation, type DraftViewStatus } from "../model/reply-draft-state";
+import { getDraftStatusCopy, getReplyDraftFailure, getSlackDeliveryPresentation, markReplyDraftRegenerationPending, type DraftViewStatus } from "../model/reply-draft-state";
+import { ReplyDraftGenerationJobStatus } from "./reply-draft-generation-job-status";
 import { ReplyDraftGenerationMetadata } from "./reply-draft-generation-metadata";
 
 type ViewState =
@@ -45,7 +46,7 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
       if (!response.ok || "error" in result) { setNotice({ tone: "error", text: "error" in result ? getReplyDraftFailure(response.status, result) : "요청을 처리하지 못했습니다." }); return; }
       if (kind === "regenerate") {
         setNotice({ tone: "success", text: "AI 초안 재생성을 요청했습니다." });
-        setState((current) => current.status === "success" ? { status: "success", draft: { ...current.draft, status: "generating", lastError: null } } : { status: "generating" });
+        setState((current) => current.status === "success" ? { status: "success", draft: markReplyDraftRegenerationPending(current.draft) } : { status: "generating" });
       } else {
         await load();
         setNotice({ tone: "success", text: "Slack 재전송을 요청했습니다." });
@@ -84,8 +85,12 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
   return <Panel>
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-semibold text-[#2e6f4f]">AI & Slack</p><h3 className="mt-1 text-lg font-semibold">{status.title}</h3><p className="mt-1 text-sm leading-6 text-[#617068]">{status.description}</p></div><Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={busy !== null}><RefreshCw aria-hidden />상태 새로고침</Button></div>
     {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
-    {draft.status === "generating" ? <div role="status" className="mt-5 flex items-center gap-3 rounded-md bg-[#fff8e6] p-4 text-sm text-[#72551b]"><Loader2 aria-hidden className="size-5 animate-spin" />생성 작업이 진행 중입니다. 잠시 후 상태를 새로고침해 주세요.</div> : null}
-    {draft.status === "failed" ? <div role="alert" className="mt-5 rounded-md bg-[#fff1ee] p-4 text-sm text-[#912018]"><div className="flex gap-2"><AlertCircle aria-hidden className="mt-0.5 size-4 shrink-0" /><span>{draft.lastError || "AI 초안 생성 중 오류가 발생했습니다."}</span></div><Button type="button" variant="outline" className="mt-4" onClick={() => void requestAction("regenerate")} disabled={busy !== null}>{busy === "regenerate" ? <Loader2 aria-hidden className="animate-spin" /> : <RotateCcw aria-hidden />}다시 생성</Button></div> : null}
+    {!draft.generationJob && draft.status === "generating" ? <div role="status" className="mt-5 flex items-center gap-3 rounded-md bg-[#fff8e6] p-4 text-sm text-[#72551b]"><Loader2 aria-hidden className="size-5 animate-spin" />생성 작업이 진행 중입니다. 잠시 후 상태를 새로고침해 주세요.</div> : null}
+    {!draft.generationJob && draft.status === "failed" ? <div role="alert" className="mt-5 rounded-md bg-[#fff1ee] p-4 text-sm text-[#912018]"><div className="flex gap-2"><AlertCircle aria-hidden className="mt-0.5 size-4 shrink-0" /><span>{draft.lastError || "AI 초안 생성 중 오류가 발생했습니다."}</span></div><Button type="button" variant="outline" className="mt-4" onClick={() => void requestAction("regenerate")} disabled={busy !== null}>{busy === "regenerate" ? <Loader2 aria-hidden className="animate-spin" /> : <RotateCcw aria-hidden />}다시 생성</Button></div> : null}
+    <ReplyDraftGenerationJobStatus
+      generationJob={draft.generationJob}
+      action={<Button type="button" variant="outline" onClick={() => void requestAction("regenerate")} disabled={busy !== null}>{busy === "regenerate" ? <Loader2 aria-hidden className="animate-spin" /> : <RotateCcw aria-hidden />}다시 생성</Button>}
+    />
     {editable ? <div className="mt-5 grid gap-4">
       <label className="grid gap-2 text-sm font-semibold text-[#526057]">문의 요약<textarea value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={2000} rows={4} disabled={busy !== null} className="resize-y rounded-md border border-[#dfe3dc] px-3 py-2 font-normal leading-6 text-[#17201a] outline-none focus:border-[#2e6f4f] focus:ring-3 focus:ring-[#2e6f4f]/15" /></label>
       {draft.needsConfirmation.length > 0 ? <div className="rounded-md border border-[#ead7aa] bg-[#fffbf1] p-4"><h4 className="flex items-center gap-2 text-sm font-semibold text-[#72551b]"><TriangleAlert aria-hidden className="size-4" />고객 확인 필요</h4><ul className="mt-3 space-y-3">{draft.needsConfirmation.map((item, index) => <li key={`${item.topic}-${index}`} className="text-sm leading-6"><strong>{item.topic}</strong><p className="text-[#6a6252]">{item.reason}</p><p className="mt-1 text-[#72551b]">질문 제안: {item.suggestedQuestion}</p></li>)}</ul></div> : null}

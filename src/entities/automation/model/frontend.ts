@@ -65,5 +65,6 @@ export type InquiryReplyDraft = {
   status: "generating" | "ready" | "failed";
   lastError: string | null;
   updatedAt: string;
+  generationJob: AdminInquiryReplyDraftResponse["generationJob"];
   slackDelivery: SlackDelivery | null;
 };
