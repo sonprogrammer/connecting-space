@@ -23,8 +23,10 @@ import {
   getInquiryStatusLabel,
 } from "@/entities/inquiry";
 import { InquiryConversionPanel } from "@/features/convert-inquiry-to-project";
+import { InquiryReplyDraftPanel } from "@/features/manage-inquiry-reply";
 import { Button } from "@/shared/ui/button";
 import type { ApiResponse } from "@/shared/types/api";
+import { InquirySelectionButton } from "./inquiry-selection-button";
 
 type InquiryListState =
   | { status: "loading" }
@@ -310,14 +312,16 @@ function InquiryListContent({
           {state.inquiries.map((inquiry) => (
             <tr
               key={inquiry.id}
-              className="cursor-pointer align-top transition hover:bg-[#f7f8f5]"
-              aria-selected={selectedInquiryId === inquiry.id}
+              className={`cursor-pointer align-top transition ${selectedInquiryId === inquiry.id ? "bg-[#edf7f0]" : "hover:bg-[#f7f8f5]"}`}
               onClick={() => onSelectInquiry(inquiry.id)}
             >
               <Cell>
-                <span className="font-medium text-[#17201a]">
-                  {inquiry.customer_name}
-                </span>
+                <InquirySelectionButton
+                  inquiryId={inquiry.id}
+                  customerName={inquiry.customer_name}
+                  selected={selectedInquiryId === inquiry.id}
+                  onSelect={onSelectInquiry}
+                />
               </Cell>
               <Cell>{getInquiryPrimaryContact(inquiry)}</Cell>
               <Cell>{inquiry.company_name || "회사명 없음"}</Cell>
@@ -570,6 +574,8 @@ function InquiryDetailForm({
             저장
           </Button>
         </div>
+
+        <InquiryReplyDraftPanel inquiryId={inquiry.id} />
 
         <InquiryConversionPanel inquiry={inquiry} onInquiryUpdated={onUpdated} />
       </div>

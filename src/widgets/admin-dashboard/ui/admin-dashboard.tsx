@@ -9,6 +9,7 @@ import {
 
 import { AdminInquiryList } from "./admin-inquiry-list";
 import { AdminPortfolioManager } from "@/widgets/admin-portfolio";
+import { AdminAutomationContentManager } from "@/widgets/admin-automation-content";
 
 const stats = [
   { label: "신규 문의", value: "7", change: "+3 이번 주", icon: MessageSquareMore },
@@ -61,6 +62,8 @@ export function AdminDashboard() {
           <AdminInquiryList />
 
           <AdminPortfolioManager />
+
+          <AdminAutomationContentManager />
 
           <section className="rounded-lg border border-[#dfe3dc] bg-white p-5">
             <div className="flex items-center gap-3">

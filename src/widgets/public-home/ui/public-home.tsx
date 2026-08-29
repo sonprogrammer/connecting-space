@@ -2,15 +2,14 @@ import Link from "next/link";
 import {
   ArrowRight,
   CheckCircle2,
-  HelpCircle,
   LayoutTemplate,
-  ReceiptText,
 } from "lucide-react";
 
 import { SubmitInquiryForm } from "@/features/submit-inquiry";
 import { buttonVariants } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
 import { PublicPortfolioSection } from "@/widgets/public-portfolio";
+import { PublicAutomationContent } from "@/widgets/public-automation-content";
 
 const services = [
   {
@@ -35,42 +34,6 @@ const process = [
   "필수 섹션, 카피, 가격 범위를 먼저 확정합니다.",
   "아임웹에서 제작하고 모바일 화면까지 점검합니다.",
   "오픈 후 수정 요청과 운영 체크리스트를 정리합니다.",
-];
-
-const plans = [
-  {
-    name: "Starter",
-    price: "90만원~",
-    description: "명함형 사이트와 빠른 검증용 랜딩에 적합합니다.",
-    features: ["메인 1p", "문의 CTA", "모바일 최적화"],
-  },
-  {
-    name: "Business",
-    price: "180만원~",
-    description: "서비스 소개, 포트폴리오, FAQ가 필요한 표준 제작입니다.",
-    features: ["메인+서브 4p", "가격/FAQ 섹션", "기본 운영 가이드"],
-  },
-  {
-    name: "Growth",
-    price: "협의",
-    description: "콘텐츠가 많거나 운영 자동화가 필요한 프로젝트입니다.",
-    features: ["콘텐츠 구조화", "전환 동선 개선", "확장 기능 설계"],
-  },
-];
-
-const faqs = [
-  {
-    question: "제작 기간은 얼마나 걸리나요?",
-    answer: "자료가 준비된 Starter는 1주 내외, Business는 보통 2~3주를 기준으로 잡습니다.",
-  },
-  {
-    question: "아임웹 계정은 누가 준비하나요?",
-    answer: "고객사 계정을 기준으로 작업합니다. 필요한 요금제와 권한은 착수 전에 안내합니다.",
-  },
-  {
-    question: "수정 요청은 어떻게 진행되나요?",
-    answer: "초안 확인 후 우선순위를 정해 반영합니다. 범위를 넘는 기능은 별도 견적으로 분리합니다.",
-  },
 ];
 
 export function PublicHome() {
@@ -163,39 +126,7 @@ export function PublicHome() {
         </div>
       </Section>
 
-      <Section id="pricing" eyebrow="Pricing" title="가격은 이후 관리자 데이터로 교체 가능한 구조입니다">
-        <div className="grid gap-4 lg:grid-cols-3">
-          {plans.map((plan) => (
-            <article key={plan.name} className="rounded-lg border border-[#d8d1c6] bg-white p-5">
-              <h3 className="text-lg font-semibold">{plan.name}</h3>
-              <p className="mt-3 text-3xl font-semibold">{plan.price}</p>
-              <p className="mt-3 min-h-12 text-sm leading-6 text-[#5f6c63]">{plan.description}</p>
-              <ul className="mt-5 space-y-2 text-sm">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex gap-2">
-                    <ReceiptText aria-hidden className="mt-0.5 size-4 text-[#2e6f4f]" />
-                    {feature}
-                  </li>
-                ))}
-              </ul>
-            </article>
-          ))}
-        </div>
-      </Section>
-
-      <Section id="faq" eyebrow="FAQ" title="문의 전에 자주 확인하는 내용">
-        <div className="grid gap-3">
-          {faqs.map((faq) => (
-            <article key={faq.question} className="rounded-lg border border-[#e1dbd0] bg-white p-5">
-              <h3 className="flex items-center gap-2 text-base font-semibold">
-                <HelpCircle aria-hidden className="size-5 text-[#2e6f4f]" />
-                {faq.question}
-              </h3>
-              <p className="mt-3 text-sm leading-6 text-[#5f6c63]">{faq.answer}</p>
-            </article>
-          ))}
-        </div>
-      </Section>
+      <PublicAutomationContent />
 
       <section id="inquiry" className="bg-[#14261f] px-5 py-16 text-white sm:px-8">
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[0.78fr_1.22fr]">
