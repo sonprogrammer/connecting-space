@@ -8,6 +8,7 @@ type ServiceRow = Database["public"]["Tables"]["service_offerings"]["Row"];
 type FaqRow = Database["public"]["Tables"]["faq_items"]["Row"];
 type ReplyDraftRow = Database["public"]["Tables"]["inquiry_reply_drafts"]["Row"];
 type NotificationDeliveryRow = Database["public"]["Tables"]["notification_deliveries"]["Row"];
+type AutomationJobRow = Database["public"]["Tables"]["automation_jobs"]["Row"];
 
 export type AdminInquiryReplyDraftResponse = {
   id: string;
@@ -25,6 +26,14 @@ export type AdminInquiryReplyDraftResponse = {
   status: ReplyDraftRow["status"];
   lastError: string | null;
   updatedAt: string;
+  generationJob: {
+    id: string;
+    status: AutomationJobRow["status"];
+    attemptCount: number;
+    maxAttempts: number;
+    availableAt: string | null;
+    lastError: string | null;
+  } | null;
   slackDelivery: NotificationDeliveryRow | null;
 };
 

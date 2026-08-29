@@ -4,6 +4,7 @@ import type { AdminInquiryReplyDraftResponse } from "@/entities/automation/api/c
 import { updateReplyDraftSchema } from "@/entities/automation/schemas/content.schema";
 import { jsonError, jsonOk } from "@/shared/api/response";
 import { getVerifiedAdminSupabase } from "@/shared/lib/auth/admin-api";
+import { createSupabaseAdminClient } from "@/shared/lib/supabase/server";
 import type { Json } from "@/shared/types/database.generated";
 
 type Context = { params: Promise<{ id: string }> };
@@ -11,11 +12,20 @@ async function getId(context: Context) { return z.string().uuid().safeParse((awa
 export async function GET(request: NextRequest, context: Context) {
   const id = await getId(context); if (!id.success) return jsonError("INVALID_INQUIRY_ID", "Invalid inquiry id", 400);
   const admin = await getVerifiedAdminSupabase(request); if (!admin.ok) return admin.response;
-  const [{ data: draft, error }, { data: deliveries, error: deliveryError }] = await Promise.all([
+  const service = createSupabaseAdminClient();
+  const [
+    { data: draft, error },
+    { data: deliveries, error: deliveryError },
+    { data: generationJobs, error: generationJobError },
+  ] = await Promise.all([
     admin.supabase.from("inquiry_reply_drafts").select("*").eq("inquiry_id", id.data).maybeSingle(),
     admin.supabase.from("notification_deliveries").select("*").eq("inquiry_id", id.data).order("created_at", { ascending: false }).limit(1),
+    service.from("automation_jobs")
+      .select("id,status,attempt_count,max_attempts,available_at,last_error")
+      .eq("inquiry_id", id.data).eq("job_type", "generate_inquiry_reply")
+      .order("created_at", { ascending: false }).limit(1),
   ]);
-  if (error || deliveryError) return jsonError("REPLY_DRAFT_READ_FAILED", "Failed to read reply draft", 500);
+  if (error || deliveryError || generationJobError) return jsonError("REPLY_DRAFT_READ_FAILED", "Failed to read reply draft", 500);
   if (!draft) return jsonError("REPLY_DRAFT_NOT_FOUND", "Reply draft not found", 404);
   const { data: generationRecord, error: generationError } = draft.generation_record_id
     ? await admin.supabase.from("ai_generation_records").select("provider,model,created_at")
@@ -27,6 +37,13 @@ export async function GET(request: NextRequest, context: Context) {
       provider: generationRecord.provider, model: generationRecord.model, createdAt: generationRecord.created_at } : null,
     summary: draft.summary, draft: draft.draft_text, needsConfirmation: draft.needs_confirmation,
     status: draft.status, lastError: draft.last_error, updatedAt: draft.updated_at,
+    generationJob: generationJobs?.[0] ? {
+      id: generationJobs[0].id, status: generationJobs[0].status,
+      attemptCount: generationJobs[0].attempt_count, maxAttempts: generationJobs[0].max_attempts,
+      availableAt: ["pending", "retry"].includes(generationJobs[0].status)
+        ? generationJobs[0].available_at : null,
+      lastError: generationJobs[0].last_error,
+    } : null,
     slackDelivery: deliveries?.[0] ?? null } satisfies AdminInquiryReplyDraftResponse;
   return jsonOk(response);
 }

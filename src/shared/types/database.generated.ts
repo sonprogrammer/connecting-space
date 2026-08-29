@@ -330,12 +330,25 @@ export type Database = {
         Args: { p_inquiry_id: string; p_job_type: Database["public"]["Enums"]["automation_job_type"]; p_payload?: Json };
         Returns: string;
       };
+      requeue_automation_job: {
+        Args: {
+          p_inquiry_id: string;
+          p_job_type: Database["public"]["Enums"]["automation_job_type"];
+          p_payload?: Json;
+          p_now?: string;
+        };
+        Returns: Database["public"]["Tables"]["automation_jobs"]["Row"];
+      };
       create_inquiry_with_automation: {
         Args: { p_inquiry: Json };
         Returns: Array<{ id: string; status: Database["public"]["Enums"]["inquiry_status"] }>;
       };
       claim_automation_jobs: {
         Args: { p_worker_id: string; p_limit?: number; p_now?: string };
+        Returns: Database["public"]["Tables"]["automation_jobs"]["Row"][];
+      };
+      claim_automation_job_by_id: {
+        Args: { p_job_id: string; p_worker_id: string; p_now?: string };
         Returns: Database["public"]["Tables"]["automation_jobs"]["Row"][];
       };
     };

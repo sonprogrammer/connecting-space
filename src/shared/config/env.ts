@@ -1,4 +1,4 @@
-import { aiProviderSchema, resolveAiProviderConfig } from "@/shared/lib/automation/ai";
+import { aiProviderSchema, resolveAiProviderConfig } from "../lib/automation/ai";
 
 const publicSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publicSupabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -37,31 +37,50 @@ export function assertServerSupabaseEnv() {
   };
 }
 
-export function assertAutomationEnv() {
-  const required = {
-    aiProvider: process.env.AI_PROVIDER,
-    aiApiKey: process.env.AI_API_KEY,
-    aiModel: process.env.AI_MODEL,
-    slackWebhookUrl: process.env.SLACK_INQUIRY_WEBHOOK_URL,
-    processSecret: process.env.AUTOMATION_PROCESS_SECRET,
-    adminBaseUrl: process.env.ADMIN_BASE_URL,
-  };
-  const missing = Object.entries(required).filter(([, value]) => !value).map(([key]) => key);
-  if (missing.length) throw new Error(`Missing automation environment variables: ${missing.join(", ")}`);
-  const values = required as { [K in keyof typeof required]: string };
-  const provider = aiProviderSchema.safeParse(values.aiProvider);
+function requireEnvironmentVariables<const T extends Record<string, string | undefined>>(
+  required: T,
+) {
+  const missing = Object.entries(required)
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
+  if (missing.length) {
+    throw new Error(`Missing environment variables: ${missing.join(", ")}`);
+  }
+  return required as { [K in keyof T]: string };
+}
+
+export function assertAiEnv() {
+  const values = requireEnvironmentVariables({
+    AI_PROVIDER: process.env.AI_PROVIDER,
+    AI_API_KEY: process.env.AI_API_KEY,
+    AI_MODEL: process.env.AI_MODEL,
+  });
+  const provider = aiProviderSchema.safeParse(values.AI_PROVIDER);
   if (!provider.success) throw new Error("AI_PROVIDER must be groq, gemini, openai, or custom");
+  return resolveAiProviderConfig({
+    provider: provider.data,
+    apiKey: values.AI_API_KEY,
+    model: values.AI_MODEL,
+    baseUrl: process.env.AI_BASE_URL,
+  });
+}
+
+export function assertSlackEnv() {
+  const values = requireEnvironmentVariables({
+    SLACK_INQUIRY_WEBHOOK_URL: process.env.SLACK_INQUIRY_WEBHOOK_URL,
+    ADMIN_BASE_URL: process.env.ADMIN_BASE_URL,
+  });
   return {
-    ai: resolveAiProviderConfig({
-      provider: provider.data,
-      apiKey: values.aiApiKey,
-      model: values.aiModel,
-      baseUrl: process.env.AI_BASE_URL,
-    }),
-    slackWebhookUrl: values.slackWebhookUrl,
-    processSecret: values.processSecret,
-    adminBaseUrl: values.adminBaseUrl,
+    slackWebhookUrl: values.SLACK_INQUIRY_WEBHOOK_URL,
+    adminBaseUrl: values.ADMIN_BASE_URL,
   };
+}
+
+export function assertAutomationProcessEnv() {
+  const values = requireEnvironmentVariables({
+    AUTOMATION_PROCESS_SECRET: process.env.AUTOMATION_PROCESS_SECRET,
+  });
+  return { processSecret: values.AUTOMATION_PROCESS_SECRET };
 }
 
 export function normalizeSupabaseProjectUrl(value: string) {
