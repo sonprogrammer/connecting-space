@@ -6,6 +6,26 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ReplyDraftGenerationJobStatus } from "../src/features/manage-inquiry-reply/ui/reply-draft-generation-job-status";
 
 describe("reply draft generation job status UI", () => {
+  test("labels the first pending schedule without calling it a retry", () => {
+    const markup = renderToStaticMarkup(
+      createElement(ReplyDraftGenerationJobStatus, {
+        generationJob: {
+          id: "job-pending",
+          status: "pending",
+          attemptCount: 0,
+          maxAttempts: 3,
+          availableAt: "2026-08-29T02:30:00.000Z",
+          lastError: null,
+        },
+      }),
+    );
+
+    assert.match(markup, /AI 생성 대기/);
+    assert.match(markup, /실행 예정/);
+    assert.doesNotMatch(markup, /다음 재시도/);
+    assert.match(markup, /dateTime="2026-08-29T02:30:00.000Z"/);
+  });
+
   test("shows retry attempts and the next scheduled attempt separately from Slack", () => {
     const markup = renderToStaticMarkup(
       createElement(ReplyDraftGenerationJobStatus, {

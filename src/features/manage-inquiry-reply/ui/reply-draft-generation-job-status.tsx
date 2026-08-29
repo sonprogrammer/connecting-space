@@ -53,6 +53,11 @@ export function ReplyDraftGenerationJobStatus({
 
   const presentation = statusPresentation[generationJob.status];
   const Icon = presentation.icon;
+  const scheduleLabel = generationJob.status === "retry"
+    ? "다음 재시도"
+    : generationJob.status === "pending"
+      ? "실행 예정"
+      : null;
 
   return (
     <div
@@ -69,9 +74,9 @@ export function ReplyDraftGenerationJobStatus({
           <p className="mt-1 leading-6">{presentation.description}</p>
           <p className="mt-2 text-xs">
             시도 {generationJob.attemptCount} / {generationJob.maxAttempts}회
-            {generationJob.availableAt ? (
+            {generationJob.availableAt && scheduleLabel ? (
               <>
-                {" · 다음 재시도 "}
+                {` · ${scheduleLabel} `}
                 <time dateTime={generationJob.availableAt}>{formatDateTime(generationJob.availableAt)}</time>
               </>
             ) : null}
