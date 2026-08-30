@@ -8,12 +8,38 @@ function isAuthorized(request: Request, expected: string) {
   const left = Buffer.from(supplied); const right = Buffer.from(expected);
   return left.length === right.length && timingSafeEqual(left, right);
 }
-export async function POST(request: Request) {
+function missingSlackVariables(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  const match = message.match(/Missing environment variables: (.+)$/);
+  if (!match) return [];
+  return match[1].split(", ").filter((name) =>
+    name === "SLACK_INQUIRY_WEBHOOK_URL" || name === "ADMIN_BASE_URL",
+  );
+}
+
+async function processRequest(request: Request, parseBody: boolean) {
   let env: ReturnType<typeof assertAutomationProcessEnv>;
   try { env = assertAutomationProcessEnv(); } catch { return jsonError("AUTOMATION_NOT_CONFIGURED", "Automation is not configured", 503); }
   if (!isAuthorized(request, env.processSecret)) return jsonError("AUTOMATION_AUTH_REQUIRED", "Automation authorization required", 401);
-  const body = await request.json().catch(() => ({})) as { limit?: unknown };
+  const body = parseBody
+    ? await request.json().catch(() => ({})) as { limit?: unknown }
+    : {};
   const limit = typeof body.limit === "number" && Number.isInteger(body.limit) ? Math.max(1, Math.min(body.limit, 20)) : 5;
-  try { return jsonOk({ results: await processAutomationJobs({ limit }) }); }
+  try {
+    const results = await processAutomationJobs({ limit });
+    const missing = [...new Set(results.flatMap((result) => missingSlackVariables(result.error)))];
+    if (missing.length) {
+      return jsonError("SLACK_NOT_CONFIGURED", "Slack notification configuration is missing", 503, { missing });
+    }
+    return jsonOk({ results });
+  }
   catch { return jsonError("AUTOMATION_PROCESS_FAILED", "Failed to process automation jobs", 500); }
+}
+
+export async function GET(request: Request) {
+  return processRequest(request, false);
+}
+
+export async function POST(request: Request) {
+  return processRequest(request, true);
 }
