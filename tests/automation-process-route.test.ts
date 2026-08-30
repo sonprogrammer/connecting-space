@@ -40,12 +40,12 @@ describe("automation process route", { concurrency: false }, () => {
     process.env.AUTOMATION_PROCESS_SECRET = "route-test-secret";
     delete process.env.SLACK_INQUIRY_WEBHOOK_URL;
     delete process.env.ADMIN_BASE_URL;
-    const route = await import("../src/app/api/internal/automation/process/route");
+    const { processAutomationRequest } = await import("../src/shared/lib/automation/process-route");
     const processJobs = async () => [{
       id: "job-id", status: "retry" as const, error: "Missing environment variables: SLACK_INQUIRY_WEBHOOK_URL, ADMIN_BASE_URL",
     }];
 
-    const response = await route.processAutomationRequest(new Request("https://example.test/api/internal/automation/process", {
+    const response = await processAutomationRequest(new Request("https://example.test/api/internal/automation/process", {
       method: "POST",
       headers: { authorization: "Bearer route-test-secret", "content-type": "application/json" },
       body: JSON.stringify({ limit: 1 }),
