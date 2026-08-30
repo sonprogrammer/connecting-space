@@ -1,0 +1,32 @@
+name: Process automation jobs
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  process-automation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Validate automation endpoint configuration
+        env:
+          AUTOMATION_PROCESS_URL: ${{ vars.AUTOMATION_PROCESS_URL }}
+          AUTOMATION_PROCESS_SECRET: ${{ secrets.AUTOMATION_PROCESS_SECRET }}
+        run: |
+          test -n "$AUTOMATION_PROCESS_URL" || { echo "Missing GitHub Actions variable: AUTOMATION_PROCESS_URL" >&2; exit 1; }
+          test -n "$AUTOMATION_PROCESS_SECRET" || { echo "Missing GitHub Actions secret: AUTOMATION_PROCESS_SECRET" >&2; exit 1; }
+
+      - name: Process pending automation jobs
+        env:
+          AUTOMATION_PROCESS_URL: ${{ vars.AUTOMATION_PROCESS_URL }}
+          AUTOMATION_PROCESS_SECRET: ${{ secrets.AUTOMATION_PROCESS_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --request GET \
+            --header "Authorization: Bearer ${AUTOMATION_PROCESS_SECRET}" \
+            "${AUTOMATION_PROCESS_URL%/}/api/internal/automation/process"

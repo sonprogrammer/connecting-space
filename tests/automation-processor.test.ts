@@ -129,6 +129,30 @@ describe("automation job processor", () => {
     assert.equal(fake.wroteDraft(), false);
   });
 
+  test("moves a pending Slack delivery to sent and completes its job", async () => {
+    process.env.SLACK_INQUIRY_WEBHOOK_URL = "https://hooks.slack.test/example";
+    process.env.ADMIN_BASE_URL = "https://admin.example.com";
+    const slackJob: Job = {
+      ...job,
+      id: "77777777-7777-4777-8777-777777777777",
+      job_type: "send_slack_notification",
+    };
+    const fake = createSlackFailureSupabase();
+
+    const result = await processor.processAutomationJob(slackJob, {
+      client: fake.client,
+      now: () => new Date(now),
+      fetch: async (input) => {
+        assert.equal(String(input), "https://hooks.slack.test/example");
+        return new Response("ok", { status: 200 });
+      },
+    });
+
+    assert.deepEqual(result, { id: slackJob.id, status: "completed" });
+    assert.equal(fake.deliveryHasStatus("sent"), true);
+    assert.equal(fake.jobHasStatus("completed"), true);
+  });
+
   test("claims only the requested job id for manual processing", async () => {
     const fake = createDirectClaimSupabase();
     const results = await processor.processAutomationJobs({
