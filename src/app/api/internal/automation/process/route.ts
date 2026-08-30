@@ -9,7 +9,7 @@ function isAuthorized(request: Request, expected: string) {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 function missingSlackVariables(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
+  const message = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   const match = message.match(/Missing environment variables: (.+)$/);
   if (!match) return [];
   return match[1].split(", ").filter((name) =>
@@ -17,7 +17,11 @@ function missingSlackVariables(error: unknown) {
   );
 }
 
-async function processRequest(request: Request, parseBody: boolean) {
+export async function processAutomationRequest(
+  request: Request,
+  parseBody: boolean,
+  processJobs: typeof processAutomationJobs = processAutomationJobs,
+) {
   let env: ReturnType<typeof assertAutomationProcessEnv>;
   try { env = assertAutomationProcessEnv(); } catch { return jsonError("AUTOMATION_NOT_CONFIGURED", "Automation is not configured", 503); }
   if (!isAuthorized(request, env.processSecret)) return jsonError("AUTOMATION_AUTH_REQUIRED", "Automation authorization required", 401);
@@ -26,7 +30,7 @@ async function processRequest(request: Request, parseBody: boolean) {
     : {};
   const limit = typeof body.limit === "number" && Number.isInteger(body.limit) ? Math.max(1, Math.min(body.limit, 20)) : 5;
   try {
-    const results = await processAutomationJobs({ limit });
+    const results = await processJobs({ limit });
     const missing = [...new Set(results.flatMap((result) => missingSlackVariables(result.error)))];
     if (missing.length) {
       return jsonError("SLACK_NOT_CONFIGURED", "Slack notification configuration is missing", 503, { missing });
@@ -37,9 +41,9 @@ async function processRequest(request: Request, parseBody: boolean) {
 }
 
 export async function GET(request: Request) {
-  return processRequest(request, false);
+  return processAutomationRequest(request, false);
 }
 
 export async function POST(request: Request) {
-  return processRequest(request, true);
+  return processAutomationRequest(request, true);
 }
