@@ -10,7 +10,7 @@ import type { ApiResponse } from "@/shared/types/api";
 import { Button } from "@/shared/ui/button";
 import {
   buildCustomerPayload, buildProjectPayload, customerToFormValues, emptyCustomerForm, emptyProjectForm,
-  getConvertedProjectId, getCustomerDetailUrl, getInquiryDetailUrl, getProjectDetailUrl, getSaveFailure, projectStatusLabels, projectStatuses, projectToFormValues,
+  getConvertedProjectId, getCustomerDetailUrl, getInquiryAnchorHref, getInquiryDetailUrl, getProjectDetailUrl, getSaveFailure, projectStatusLabels, projectStatuses, projectToFormValues,
   toCustomerListState, toProjectListState, type AdminCustomerListState, type AdminProjectListState,
   type CustomerFormValues, type ProjectFormValues,
 } from "../model/admin-customer-project-state";
@@ -201,7 +201,7 @@ function Field({ label, value, onChange, error, type = "text", required, disable
 function TextArea({ label, value, onChange, error, disabled }: Readonly<{ label: string; value: string; onChange: (value: string) => void; error?: string[]; disabled?: boolean }>) { return <label className="grid gap-1 text-sm font-medium">{label}<textarea value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} rows={4} className="rounded-md border border-[#d8d1c6] p-2 font-normal outline-none focus:border-[#2e6f4f] disabled:bg-[#f5f6f3]" />{error?.map((message) => <span key={message} className="text-xs font-normal text-[#912018]">{message}</span>)}</label>; }
 function Links({ inquiryId, customer, project, customerState, projectState, onCustomer, onProject }: Readonly<{ inquiryId?: string | null; customer?: AdminCustomerDetail; project?: AdminProjectDetail; customerState?: LinkedState<AdminCustomerDetail>; projectState?: LinkedState<AdminProjectDetail>; onCustomer?: () => void; onProject?: () => void }>) {
   return <div className="flex flex-wrap items-center gap-2 text-xs text-[#617068]">
-    {inquiryId ? <span className="rounded bg-[#f5f6f3] px-2 py-1">문의 연결: {inquiryId}</span> : null}
+    {inquiryId ? <a href={getInquiryAnchorHref(inquiryId)} className="rounded bg-[#f5f6f3] px-2 py-1 underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-[#2e6f4f]">문의 상세: {inquiryId}</a> : null}
     {customer ? <Button type="button" variant="outline" size="xs" onClick={onCustomer}>연결 고객: {customer.name}</Button> : null}
     {project ? <Button type="button" variant="outline" size="xs" onClick={onProject}>연결 프로젝트: {project.name}</Button> : null}
     {customerState?.status === "loading" ? <span role="status">연결 고객을 불러오는 중입니다.</span> : null}

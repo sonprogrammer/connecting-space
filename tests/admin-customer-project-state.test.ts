@@ -8,6 +8,7 @@ import {
   getConvertedProjectId,
   getCustomerDetailUrl,
   getInquiryDetailUrl,
+  getInquiryAnchorHref,
   getProjectDetailUrl,
   projectStatusLabels,
   toCustomerListState,
@@ -38,6 +39,7 @@ describe("admin customer/project model", () => {
     assert.equal(getConvertedProjectId({ converted_project_id: null }), null);
     assert.equal(getCustomerDetailUrl("customer-21"), "/api/admin/customers/customer-21");
     assert.equal(getInquiryDetailUrl("inquiry-21"), "/api/admin/inquiries/inquiry-21");
+    assert.equal(getInquiryAnchorHref("inquiry-21"), "/admin#inquiry-inquiry-21");
     assert.equal(getProjectDetailUrl("project-21"), "/api/admin/projects/project-21");
   });
 });
