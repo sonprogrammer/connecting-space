@@ -22,7 +22,7 @@
 6. 문의의 `converted_*_id`와 `status='converted'`를 저장하고 고객·프로젝트를 반환한다.
 7. 모든 단계가 성공해야 commit하며 실패 시 전체 rollback한다.
 
-RPC는 service role이 호출할 수 있도록 migration에 정의한다. 기존 데이터는 `inquiry_id` 연결을 기준으로 `converted_*_id`를 보정하는 별도 SQL을 적용할 수 있도록 절차만 기록하고, 이번 PR에서는 원격 DB에 실행하지 않는다.
+RPC는 관리자 사용자 client가 인증된 세션으로 호출할 수 있도록 migration에 정의한다. 기존 데이터는 `inquiry_id` 연결을 기준으로 `converted_*_id`를 보정하는 별도 SQL을 적용할 수 있도록 절차만 기록하고, 이번 PR에서는 원격 DB에 실행하지 않는다.
 
 ## 목록 API 계약
 

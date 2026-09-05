@@ -4,7 +4,7 @@
 
 **Goal:** 문의 전환을 원자적으로 멱등 처리하고 관리자 고객·프로젝트 목록에 검색·필터·정렬·페이지네이션을 제공한다.
 
-**Architecture:** 관리자 전환 route는 service-role Supabase RPC 한 번으로 고객·프로젝트 재사용/생성 및 문의 연결을 트랜잭션 처리한다. 목록 route는 공통 query parser로 검증한 뒤 기존 관리자 Supabase client의 count 쿼리를 사용하고, migration에는 RPC·인덱스·기존 데이터 보정 절차를 기록한다.
+**Architecture:** 관리자 전환 route는 인증된 관리자 사용자 Supabase client로 RPC 한 번을 호출해 고객·프로젝트 재사용/생성 및 문의 연결을 트랜잭션 처리한다. 목록 route는 공통 query parser로 검증한 뒤 기존 관리자 Supabase client의 count 쿼리를 사용하고, migration에는 RPC·인덱스·기존 데이터 보정 절차를 기록한다.
 
 **Tech Stack:** Next.js 16 App Router Route Handlers, TypeScript, Zod, Supabase JS, PostgreSQL PL/pgSQL, Node test runner.
 
