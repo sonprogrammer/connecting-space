@@ -100,6 +100,12 @@ export const emptyProjectForm: ProjectFormValues = {
   memo: "",
 };
 
+export function resolveSelectedId<T extends { id: string }>(currentId: string | null, items: T[]) {
+  return currentId && items.some((item) => item.id === currentId)
+    ? currentId
+    : items[0]?.id ?? null;
+}
+
 export function customerToFormValues(customer: AdminCustomerDetail | AdminCustomerListItem): CustomerFormValues {
   return {
     name: customer.name,

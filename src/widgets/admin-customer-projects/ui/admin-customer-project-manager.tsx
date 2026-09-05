@@ -11,6 +11,7 @@ import { Button } from "@/shared/ui/button";
 import {
   buildCustomerPayload, buildProjectPayload, customerToFormValues, emptyCustomerForm, emptyProjectForm,
   getInquiryAnchorHref, getSaveFailure, projectStatusLabels, projectStatuses, projectToFormValues,
+  resolveSelectedId,
   type AdminCustomerListState, type AdminProjectListState,
   type CustomerFormValues, type ProjectFormValues,
 } from "../model/admin-customer-project-state";
@@ -58,6 +59,14 @@ export function AdminCustomerProjectManager() {
   const projectDetail = toDetailState(projectDetailQuery, activeProjectId);
   const linkedProject = toLinkedState(linkedProjectQuery, linkedProjectId);
   const linkedCustomer = toLinkedState(linkedCustomerQuery, linkedCustomerId);
+  useEffect(() => {
+    if (!customerListQuery.data) return;
+    queueMicrotask(() => setSelectedCustomerId((current) => resolveSelectedId(current, customerListQuery.data.items)));
+  }, [customerListQuery.data]);
+  useEffect(() => {
+    if (!projectListQuery.data) return;
+    queueMicrotask(() => setSelectedProjectId((current) => resolveSelectedId(current, projectListQuery.data.items)));
+  }, [projectListQuery.data]);
   const refresh = () => {
     if (tab === "customers") {
       void customerListQuery.refetch();
