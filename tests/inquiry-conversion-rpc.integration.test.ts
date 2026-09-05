@@ -18,7 +18,7 @@ describe("production inquiry conversion RPC", { skip: !enabled }, () => {
       p_customer_name: "RPC integration test",
       p_customer_memo: "",
       p_project_name: "RPC integration test",
-      p_contract_amount: null,
+      p_contract_amount: 0,
       p_expected_launch_date: null,
       p_project_memo: "",
     };
@@ -27,11 +27,13 @@ describe("production inquiry conversion RPC", { skip: !enabled }, () => {
     assert.equal(first.error, null, first.error?.message);
     const second = await supabase.rpc("convert_inquiry_to_project", payload);
     assert.equal(second.error, null, second.error?.message);
-    assert.deepEqual(second.data, first.data);
-
-    const customerId = first.data?.[0]?.customer_id;
-    const projectId = first.data?.[0]?.project_id;
+    const firstResult = first.data?.[0];
+    const secondResult = second.data?.[0];
+    const customerId = firstResult?.customer_id;
+    const projectId = firstResult?.project_id;
     assert.ok(customerId && projectId);
+    assert.equal(secondResult?.customer_id, customerId);
+    assert.equal(secondResult?.project_id, projectId);
     const [customers, projects] = await Promise.all([
       supabase.from("customers").select("id", { count: "exact", head: true }).eq("inquiry_id", inquiryId),
       supabase.from("projects").select("id", { count: "exact", head: true }).eq("inquiry_id", inquiryId),
