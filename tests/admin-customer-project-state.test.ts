@@ -11,6 +11,7 @@ import {
   getInquiryAnchorHref,
   getProjectDetailUrl,
   projectStatusLabels,
+  resolveSelectedId,
   toCustomerListState,
 } from "../src/widgets/admin-customer-projects/model/admin-customer-project-state";
 
@@ -41,5 +42,11 @@ describe("admin customer/project model", () => {
     assert.equal(getInquiryDetailUrl("inquiry-21"), "/api/admin/inquiries/inquiry-21");
     assert.equal(getInquiryAnchorHref("inquiry-21"), "/admin#inquiry-inquiry-21");
     assert.equal(getProjectDetailUrl("project-21"), "/api/admin/projects/project-21");
+  });
+
+  test("resets a selection when a list query no longer contains it", () => {
+    assert.equal(resolveSelectedId("customer-1", [{ id: "customer-2" }]), "customer-2");
+    assert.equal(resolveSelectedId("customer-1", []), null);
+    assert.equal(resolveSelectedId("customer-2", [{ id: "customer-2" }]), "customer-2");
   });
 });
