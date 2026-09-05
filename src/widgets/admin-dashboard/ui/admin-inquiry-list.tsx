@@ -142,6 +142,21 @@ export function AdminInquiryList() {
   }, [fetchInquiries]);
 
   useEffect(() => {
+    function selectInquiryFromHash() {
+      const inquiryId = window.location.hash.startsWith("#inquiry-")
+        ? window.location.hash.slice("#inquiry-".length)
+        : null;
+      if (inquiryId) {
+        setSelectedInquiryId(inquiryId);
+      }
+    }
+
+    queueMicrotask(selectInquiryFromHash);
+    window.addEventListener("hashchange", selectInquiryFromHash);
+    return () => window.removeEventListener("hashchange", selectInquiryFromHash);
+  }, []);
+
+  useEffect(() => {
     if (!selectedInquiryId) {
       return;
     }
@@ -312,6 +327,7 @@ function InquiryListContent({
           {state.inquiries.map((inquiry) => (
             <tr
               key={inquiry.id}
+              id={`inquiry-${inquiry.id}`}
               className={`cursor-pointer align-top transition ${selectedInquiryId === inquiry.id ? "bg-[#edf7f0]" : "hover:bg-[#f7f8f5]"}`}
               onClick={() => onSelectInquiry(inquiry.id)}
             >
