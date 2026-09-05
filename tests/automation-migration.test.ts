@@ -15,6 +15,10 @@ const manualRequeueMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202608260001_requeue_manual_automation_jobs.sql",
 );
+const conversionMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202609050001_inquiry_conversion_integrity.sql",
+);
 
 describe("inquiry automation migration", () => {
   it("defines durable tables, RLS, idempotency, and service-role RPCs", () => {
@@ -74,5 +78,17 @@ describe("inquiry automation migration", () => {
     assert.match(sql, /jobs\.id = p_job_id/);
     assert.match(sql, /grant execute on function public\.requeue_automation_job/);
     assert.match(sql, /grant execute on function public\.claim_automation_job_by_id/);
+  });
+
+  it("defines atomic inquiry conversion and legacy backfill procedure", () => {
+    assert.equal(existsSync(conversionMigrationPath), true);
+    const sql = readFileSync(conversionMigrationPath, "utf8").toLowerCase();
+    assert.match(sql, /create unique index customers_inquiry_id_unique_idx/);
+    assert.match(sql, /create unique index projects_inquiry_id_unique_idx/);
+    assert.match(sql, /create or replace function public\.convert_inquiry_to_project/);
+    assert.match(sql, /for update/);
+    assert.match(sql, /status = 'converted'/);
+    assert.match(sql, /backfill procedure/);
+    assert.match(sql, /where c\.inquiry_id = i\.id/);
   });
 });

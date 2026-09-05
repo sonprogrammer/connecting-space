@@ -3,23 +3,12 @@
 import { useState } from "react";
 import { CheckCircle2, Loader2, UserRoundPlus } from "lucide-react";
 
-import type {
-  AdminCustomerCreateResponse,
-  AdminCustomerListItem,
-} from "@/entities/customer";
 import type { AdminInquiryDetail } from "@/entities/inquiry";
-import type {
-  AdminProjectCreateResponse,
-  AdminProjectListItem,
-} from "@/entities/project";
 import { Button } from "@/shared/ui/button";
 import type { ApiResponse } from "@/shared/types/api";
 
 import {
-  buildConversionCustomerPayload,
-  buildConversionProjectPayload,
-  findInquiryCustomer,
-  findInquiryProject,
+  buildConversionPayload,
   isInquiryConverted,
 } from "../model/conversion-payload";
 
@@ -85,34 +74,6 @@ export function InquiryConversionPanel({
     return result.data;
   }
 
-  async function fetchExistingCustomer() {
-    const response = await fetch("/api/admin/customers", {
-      headers: {
-        Accept: "application/json",
-      },
-    });
-    const customers = await parseJsonResponse<AdminCustomerListItem[]>(
-      response,
-      "기존 고객 목록을 확인하지 못했습니다.",
-    );
-
-    return customers ? findInquiryCustomer(inquiry.id, customers) : null;
-  }
-
-  async function fetchExistingProject() {
-    const response = await fetch("/api/admin/projects", {
-      headers: {
-        Accept: "application/json",
-      },
-    });
-    const projects = await parseJsonResponse<AdminProjectListItem[]>(
-      response,
-      "기존 프로젝트 목록을 확인하지 못했습니다.",
-    );
-
-    return projects ? findInquiryProject(inquiry.id, projects) : null;
-  }
-
   async function convertInquiry() {
     if (disabled) {
       return;
@@ -121,93 +82,26 @@ export function InquiryConversionPanel({
     setConversionState({ status: "converting" });
 
     try {
-      let reusedCustomer = true;
-      let customer = await fetchExistingCustomer();
-
-      if (!customer) {
-        reusedCustomer = false;
-        const customerResponse = await fetch("/api/admin/customers", {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(
-            buildConversionCustomerPayload(inquiry, {
-              customerName,
-              customerMemo,
-            }),
-          ),
-        });
-        customer = await parseJsonResponse<AdminCustomerCreateResponse>(
-          customerResponse,
-          "고객을 생성하지 못했습니다.",
-        );
-
-        if (!customer) {
-          return;
-        }
-      }
-
-      let reusedProject = true;
-      let project = await fetchExistingProject();
-
-      if (!project) {
-        reusedProject = false;
-        const projectResponse = await fetch("/api/admin/projects", {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(
-            buildConversionProjectPayload(inquiry, {
-              customerId: customer.id,
-              projectName,
-              contractAmount,
-              expectedLaunchDate,
-              projectMemo,
-            }),
-          ),
-        });
-        project = await parseJsonResponse<AdminProjectCreateResponse>(
-          projectResponse,
-          "프로젝트를 생성하지 못했습니다.",
-        );
-
-        if (!project) {
-          return;
-        }
-      }
-
-      const inquiryResponse = await fetch(`/api/admin/inquiries/${inquiry.id}`, {
-        method: "PATCH",
+      const response = await fetch(`/api/admin/inquiries/${inquiry.id}/convert`, {
+        method: "POST",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          status: "converted",
-          adminNotes: inquiry.admin_notes,
+          ...buildConversionPayload(inquiry, { customerName, customerMemo, projectName, contractAmount, expectedLaunchDate, projectMemo }),
         }),
       });
-      const updatedInquiry = await parseJsonResponse<AdminInquiryDetail>(
-        inquiryResponse,
-        "문의 전환 상태를 저장하지 못했습니다.",
-      );
-
-      if (!updatedInquiry) {
-        return;
-      }
-
-      onInquiryUpdated(updatedInquiry);
+      const result = await parseJsonResponse<{ inquiry_id: string; customer_id: string; project_id: string; reused_customer: boolean; reused_project: boolean }>(response, "문의 전환을 완료하지 못했습니다.");
+      if (!result) return;
+      onInquiryUpdated({ ...inquiry, status: "converted", converted_customer_id: result.customer_id, converted_project_id: result.project_id });
       setConversionState({
         status: "success",
-        customerId: customer.id,
-        projectId: project.id,
-        projectName: project.name,
-        reusedCustomer,
-        reusedProject,
+        customerId: result.customer_id,
+        projectId: result.project_id,
+        projectName,
+        reusedCustomer: result.reused_customer,
+        reusedProject: result.reused_project,
       });
     } catch (error) {
       setConversionState({

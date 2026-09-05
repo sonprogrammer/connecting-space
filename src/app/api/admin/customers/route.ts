@@ -4,9 +4,11 @@ import {
   createCustomerSchema,
   type AdminCustomerCreateResponse,
   type AdminCustomerListItem,
+  type AdminCustomerListResponse,
 } from "@/entities/customer";
 import { jsonError, jsonOk } from "@/shared/api/response";
 import { getVerifiedAdminSupabase } from "@/shared/lib/auth/admin-api";
+import { paginatedResponse, parseListQuery } from "@/shared/api/list-query";
 
 export async function GET(request: NextRequest) {
   const admin = await getVerifiedAdminSupabase(request);
@@ -15,19 +17,32 @@ export async function GET(request: NextRequest) {
     return admin.response;
   }
 
-  const { data, error } = await admin.supabase
+  const query = parseListQuery(request.nextUrl.searchParams, {
+    sortFields: ["created_at", "name", "company_name"],
+  });
+  if (!query.ok) return jsonError("VALIDATION_ERROR", "Invalid customer list query", 400, { errors: query.errors });
+
+  const { q, page, pageSize, sort, direction } = query.value;
+  let builder = admin.supabase
     .from("customers")
     .select(
       "id, inquiry_id, name, email, phone, company_name, website_url, created_at, updated_at",
-    )
-    .order("created_at", { ascending: false })
-    .limit(100);
+      { count: "exact" },
+    );
+  if (q) {
+    const safe = q.replace(/[%,()]/g, " ");
+    builder = builder.or(`name.ilike.*${safe}*,company_name.ilike.*${safe}*,email.ilike.*${safe}*,phone.ilike.*${safe}*,website_url.ilike.*${safe}*`);
+  }
+  const { data, error, count } = await builder
+    .order(sort as "created_at" | "name" | "company_name", { ascending: direction === "asc" })
+    .order("id", { ascending: true })
+    .range((page - 1) * pageSize, page * pageSize - 1);
 
   if (error) {
     return jsonError("ADMIN_CUSTOMERS_READ_FAILED", error.message, 500);
   }
 
-  return jsonOk<AdminCustomerListItem[]>(data);
+  return jsonOk<AdminCustomerListResponse>(paginatedResponse(data as AdminCustomerListItem[], count ?? 0, query.value));
 }
 
 export async function POST(request: NextRequest) {

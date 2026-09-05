@@ -2,6 +2,7 @@ export type {
   AdminCustomerCreateResponse,
   AdminCustomerDetail,
   AdminCustomerListItem,
+  AdminCustomerListResponse,
   AdminCustomerUpdateResponse,
 } from "./api/contracts";
 

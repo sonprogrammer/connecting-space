@@ -351,6 +351,24 @@ export type Database = {
         Args: { p_job_id: string; p_worker_id: string; p_now?: string };
         Returns: Database["public"]["Tables"]["automation_jobs"]["Row"][];
       };
+      convert_inquiry_to_project: {
+        Args: {
+          p_inquiry_id: string;
+          p_customer_name: string;
+          p_customer_memo?: string | null;
+          p_project_name: string;
+          p_contract_amount: number;
+          p_expected_launch_date?: string | null;
+          p_project_memo?: string | null;
+        };
+        Returns: Array<{
+          inquiry_id: string;
+          customer_id: string;
+          project_id: string;
+          reused_customer: boolean;
+          reused_project: boolean;
+        }>;
+      };
     };
     Enums: {
       inquiry_status: "new" | "contacted" | "qualified" | "converted" | "closed";

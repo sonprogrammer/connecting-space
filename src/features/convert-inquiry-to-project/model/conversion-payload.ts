@@ -15,6 +15,20 @@ export type ConversionProjectFormValues = {
   projectMemo: string;
 };
 
+export type ConversionFormValues = ConversionCustomerFormValues & Omit<ConversionProjectFormValues, "customerId">;
+
+export function buildConversionPayload(inquiry: AdminInquiryDetail, values: ConversionFormValues) {
+  const contractAmount = Number.parseInt(values.contractAmount, 10);
+  return {
+    customerName: values.customerName.trim(),
+    customerMemo: values.customerMemo.trim(),
+    projectName: values.projectName.trim(),
+    contractAmount: Number.isFinite(contractAmount) ? contractAmount : 0,
+    expectedLaunchDate: values.expectedLaunchDate,
+    projectMemo: values.projectMemo.trim(),
+  };
+}
+
 export function isInquiryConverted(inquiry: AdminInquiryDetail) {
   return (
     inquiry.status === "converted" ||
