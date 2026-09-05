@@ -12,13 +12,13 @@ import type { ApiFailure, ApiResponse } from "@/shared/types/api";
 
 export type AdminCustomerListState =
   | { status: "loading" }
-  | { status: "success"; items: AdminCustomerListItem[]; page: number; totalPages: number }
+  | { status: "success"; items: AdminCustomerListItem[]; page: number; totalPages: number; warning?: string }
   | { status: "empty"; page: number; totalPages: number }
   | { status: "error"; message: string };
 
 export type AdminProjectListState =
   | { status: "loading" }
-  | { status: "success"; items: AdminProjectListItem[]; page: number; totalPages: number }
+  | { status: "success"; items: AdminProjectListItem[]; page: number; totalPages: number; warning?: string }
   | { status: "empty"; page: number; totalPages: number }
   | { status: "error"; message: string };
 
@@ -104,6 +104,17 @@ export function resolveSelectedId<T extends { id: string }>(currentId: string | 
   return currentId && items.some((item) => item.id === currentId)
     ? currentId
     : items[0]?.id ?? null;
+}
+
+export function applyAdminSearch<T extends string>(query: string, status?: T) {
+  return { query, status, page: 1 };
+}
+
+export function getAdminQueryWarning(error: unknown, entity: string) {
+  const status = typeof error === "object" && error !== null && "status" in error ? (error as { status?: unknown }).status : undefined;
+  return status === 401 || status === 403
+    ? "관리자 로그인이 만료되었습니다. 다시 로그인해 주세요."
+    : `${entity}을(를) 불러오지 못했습니다.`;
 }
 
 export function customerToFormValues(customer: AdminCustomerDetail | AdminCustomerListItem): CustomerFormValues {
