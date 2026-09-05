@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import { QueryClient } from "@tanstack/react-query";
 
@@ -7,7 +8,7 @@ import {
   parseAdminQueryResponse,
   type AdminQueryError,
 } from "../src/widgets/admin-customer-projects/model/admin-customer-project-queries";
-import { applyAdminSearch, getAdminQueryWarning } from "../src/widgets/admin-customer-projects/model/admin-customer-project-state";
+import { applyAdminSearch, getAdminQueryWarning, getCachedQueryWarning } from "../src/widgets/admin-customer-projects/model/admin-customer-project-state";
 
 describe("admin customer/project query model", () => {
   test("keeps list keys separate for every pagination and filter value", () => {
@@ -53,5 +54,15 @@ describe("admin customer/project query model", () => {
   test("keeps cached screens actionable when a refetch fails", () => {
     assert.equal(getAdminQueryWarning(new Error("network down"), "고객"), "고객을(를) 불러오지 못했습니다.");
     assert.equal(getAdminQueryWarning({ status: 401 }, "상세"), "관리자 로그인이 만료되었습니다. 다시 로그인해 주세요.");
+    assert.equal(getCachedQueryWarning(true, true, { status: 403 }, "고객"), "관리자 로그인이 만료되었습니다. 다시 로그인해 주세요.");
+    assert.equal(getCachedQueryWarning(true, true, new Error("network down"), "고객"), "고객을(를) 불러오지 못했습니다.");
+    assert.equal(getCachedQueryWarning(true, false, null, "고객"), undefined);
+  });
+
+  test("keeps project date validation messages wired to their fields", () => {
+    const source = readFileSync("src/widgets/admin-customer-projects/ui/admin-customer-project-manager.tsx", "utf8");
+    assert.match(source, /label="예상 시작일"[^\n]*error=\{fieldErrors\.expectedStartDate\}/);
+    assert.match(source, /label="예상 출시일"[^\n]*error=\{fieldErrors\.expectedLaunchDate\}/);
+    assert.match(source, /label="출시일"[^\n]*error=\{fieldErrors\.launchedAt\}/);
   });
 });
