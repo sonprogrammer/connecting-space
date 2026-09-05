@@ -19,6 +19,10 @@ const conversionMigrationPath = join(
   process.cwd(),
   "supabase/migrations/202609050001_inquiry_conversion_integrity.sql",
 );
+const conversionFixMigrationPath = join(
+  process.cwd(),
+  "supabase/migrations/202609050002_fix_inquiry_conversion_qualified_refs.sql",
+);
 
 describe("inquiry automation migration", () => {
   it("defines durable tables, RLS, idempotency, and service-role RPCs", () => {
@@ -90,5 +94,16 @@ describe("inquiry automation migration", () => {
     assert.match(sql, /status = 'converted'/);
     assert.match(sql, /backfill procedure/);
     assert.match(sql, /where c\.inquiry_id = i\.id/);
+  });
+
+  it("qualifies conversion table references in the follow-up migration", () => {
+    assert.equal(existsSync(conversionFixMigrationPath), true);
+    const sql = readFileSync(conversionFixMigrationPath, "utf8").toLowerCase();
+    assert.match(sql, /create or replace function public\.convert_inquiry_to_project/);
+    assert.match(sql, /from public\.customers as c where c\.inquiry_id/);
+    assert.match(sql, /from public\.projects as p where p\.inquiry_id/);
+    assert.match(sql, /update public\.inquiries as i/);
+    assert.doesNotMatch(sql, /from public\.customers where inquiry_id/);
+    assert.doesNotMatch(sql, /from public\.projects where inquiry_id/);
   });
 });
