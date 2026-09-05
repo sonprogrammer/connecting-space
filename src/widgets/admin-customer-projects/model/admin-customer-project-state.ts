@@ -7,6 +7,7 @@ import type {
   AdminProjectListItem,
   ProjectStatus,
 } from "@/entities/project";
+import type { AdminInquiryDetail } from "@/entities/inquiry";
 import type { ApiFailure, ApiResponse } from "@/shared/types/api";
 
 export type AdminCustomerListState =
@@ -58,6 +59,22 @@ export const projectStatusLabels: Record<ProjectStatus, string> = {
   paused: "보류",
   cancelled: "취소",
 };
+
+export function getConvertedProjectId(inquiry: Pick<AdminInquiryDetail, "converted_project_id">) {
+  return inquiry.converted_project_id;
+}
+
+export function getCustomerDetailUrl(customerId: string) {
+  return `/api/admin/customers/${customerId}`;
+}
+
+export function getProjectDetailUrl(projectId: string) {
+  return `/api/admin/projects/${projectId}`;
+}
+
+export function getInquiryDetailUrl(inquiryId: string) {
+  return `/api/admin/inquiries/${inquiryId}`;
+}
 
 export const emptyCustomerForm: CustomerFormValues = {
   name: "",

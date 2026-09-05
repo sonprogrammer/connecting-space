@@ -5,6 +5,10 @@ import {
   buildCustomerPayload,
   buildProjectPayload,
   getSaveFailure,
+  getConvertedProjectId,
+  getCustomerDetailUrl,
+  getInquiryDetailUrl,
+  getProjectDetailUrl,
   projectStatusLabels,
   toCustomerListState,
 } from "../src/widgets/admin-customer-projects/model/admin-customer-project-state";
@@ -27,5 +31,13 @@ describe("admin customer/project model", () => {
   test("exposes readable project statuses and validation fields", () => {
     assert.equal(projectStatusLabels.in_progress, "제작 중");
     assert.deepEqual(getSaveFailure(400, { error: { code: "VALIDATION_ERROR", message: "bad", details: { fieldErrors: { name: ["필수"] } } } }, "고객").fieldErrors, { name: ["필수"] });
+  });
+
+  test("uses the inquiry conversion link to resolve a project outside the current list page", () => {
+    assert.equal(getConvertedProjectId({ converted_project_id: "project-21" }), "project-21");
+    assert.equal(getConvertedProjectId({ converted_project_id: null }), null);
+    assert.equal(getCustomerDetailUrl("customer-21"), "/api/admin/customers/customer-21");
+    assert.equal(getInquiryDetailUrl("inquiry-21"), "/api/admin/inquiries/inquiry-21");
+    assert.equal(getProjectDetailUrl("project-21"), "/api/admin/projects/project-21");
   });
 });
