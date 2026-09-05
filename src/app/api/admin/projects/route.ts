@@ -4,9 +4,11 @@ import {
   createProjectSchema,
   type AdminProjectCreateResponse,
   type AdminProjectListItem,
+  type AdminProjectListResponse,
 } from "@/entities/project";
 import { jsonError, jsonOk } from "@/shared/api/response";
 import { getVerifiedAdminSupabase } from "@/shared/lib/auth/admin-api";
+import { paginatedResponse, parseListQuery } from "@/shared/api/list-query";
 
 export async function GET(request: NextRequest) {
   const admin = await getVerifiedAdminSupabase(request);
@@ -15,19 +17,38 @@ export async function GET(request: NextRequest) {
     return admin.response;
   }
 
-  const { data, error } = await admin.supabase
+  const query = parseListQuery(request.nextUrl.searchParams, {
+    sortFields: ["created_at", "name", "status", "expected_launch_date"],
+  });
+  if (!query.ok) return jsonError("VALIDATION_ERROR", "Invalid project list query", 400, { errors: query.errors });
+
+  const status = request.nextUrl.searchParams.get("status");
+  const allowedStatuses = ["planning", "in_progress", "review", "completed", "paused", "cancelled"] as const;
+  if (status && !allowedStatuses.includes(status as typeof allowedStatuses[number])) {
+    return jsonError("VALIDATION_ERROR", "Invalid project status", 400);
+  }
+  const { q, page, pageSize, sort, direction } = query.value;
+  let builder = admin.supabase
     .from("projects")
     .select(
       "id, customer_id, inquiry_id, name, status, contract_amount, expected_launch_date, created_at, updated_at",
-    )
-    .order("created_at", { ascending: false })
-    .limit(100);
+      { count: "exact" },
+    );
+  if (q) {
+    const safe = q.replace(/[%,()]/g, " ");
+    builder = builder.or(`name.ilike.*${safe}*,description.ilike.*${safe}*`);
+  }
+  if (status) builder = builder.eq("status", status as typeof allowedStatuses[number]);
+  const { data, error, count } = await builder
+    .order(sort as "created_at" | "name" | "status" | "expected_launch_date", { ascending: direction === "asc" })
+    .order("id", { ascending: true })
+    .range((page - 1) * pageSize, page * pageSize - 1);
 
   if (error) {
     return jsonError("ADMIN_PROJECTS_READ_FAILED", error.message, 500);
   }
 
-  return jsonOk<AdminProjectListItem[]>(data);
+  return jsonOk<AdminProjectListResponse>(paginatedResponse(data as AdminProjectListItem[], count ?? 0, query.value));
 }
 
 export async function POST(request: NextRequest) {

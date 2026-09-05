@@ -16,3 +16,10 @@ export type AdminCustomerListItem = Pick<
 export type AdminCustomerDetail = CustomerRow;
 export type AdminCustomerCreateResponse = AdminCustomerDetail;
 export type AdminCustomerUpdateResponse = AdminCustomerDetail;
+export type AdminCustomerListResponse = {
+  items: AdminCustomerListItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};

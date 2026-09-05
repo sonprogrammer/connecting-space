@@ -4,6 +4,7 @@ import { describe, test } from "node:test";
 import type { AdminInquiryDetail } from "../src/entities/inquiry";
 import {
   buildConversionCustomerPayload,
+  buildConversionPayload,
   buildConversionProjectPayload,
   findInquiryCustomer,
   findInquiryProject,
@@ -32,6 +33,16 @@ const baseInquiry: AdminInquiryDetail = {
 };
 
 describe("inquiry conversion payloads", () => {
+  test("builds one atomic conversion payload", () => {
+    assert.deepEqual(buildConversionPayload(baseInquiry, {
+      customerName: "  손 대표님  ", customerMemo: "  메모  ", projectName: "  홈페이지  ",
+      contractAmount: "5000000", expectedLaunchDate: "2026-09-01", projectMemo: "  범위  ",
+    }), {
+      customerName: "손 대표님", customerMemo: "메모", projectName: "홈페이지",
+      contractAmount: 5000000, expectedLaunchDate: "2026-09-01", projectMemo: "범위",
+    });
+  });
+
   test("detects converted inquiries from status or conversion ids", () => {
     assert.equal(isInquiryConverted(baseInquiry), false);
     assert.equal(isInquiryConverted({ ...baseInquiry, status: "converted" }), true);

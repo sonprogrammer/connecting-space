@@ -16,3 +16,10 @@ export type AdminProjectListItem = Pick<
 export type AdminProjectDetail = ProjectRow;
 export type AdminProjectCreateResponse = AdminProjectDetail;
 export type AdminProjectUpdateResponse = AdminProjectDetail;
+export type AdminProjectListResponse = {
+  items: AdminProjectListItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};

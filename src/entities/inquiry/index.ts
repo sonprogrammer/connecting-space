@@ -4,8 +4,10 @@ export type {
   AdminInquiryStatusUpdateResponse,
   InquiryRow,
 } from "./api/contracts";
+export { convertInquirySchema, type ConvertInquiryInput, type ConvertInquiryResponse } from "./api/conversion-contracts";
 
 export type { InquiryStatus } from "./model/types";
+export { inquiryIdSchema } from "./api/conversion-contracts";
 
 export type {
   AdminInquiryStatus,
