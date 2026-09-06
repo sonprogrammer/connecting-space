@@ -12,6 +12,9 @@ test("project payment manager keeps mutations project-scoped and exposes QA-crit
   assert.match(source, /다시 시도/);
   assert.match(source, /role="alert"/);
   assert.match(source, /aria-label="입금액"/);
+  assert.match(source, /aria-invalid=\{Boolean\(error\)\}/);
+  assert.match(source, /aria-busy=\{saving\}/);
+  assert.match(source, /if \(succeeded\) \{/);
 });
 
 test("project panel mounts payment management for the selected project", async () => {
