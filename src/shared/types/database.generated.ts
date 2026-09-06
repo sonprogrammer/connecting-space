@@ -167,6 +167,30 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["payments"]["Insert"]>;
         Relationships: [];
       };
+      payment_receipts: {
+        Row: {
+          id: string;
+          payment_id: string;
+          amount: number;
+          received_at: string;
+          idempotency_key: string;
+          memo: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          payment_id: string;
+          amount: number;
+          received_at?: string;
+          idempotency_key: string;
+          memo?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["payment_receipts"]["Insert"]>;
+        Relationships: [];
+      };
       portfolio_items: {
         Row: {
           id: string;
