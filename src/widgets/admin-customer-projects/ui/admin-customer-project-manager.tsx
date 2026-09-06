@@ -10,7 +10,7 @@ import type { ApiResponse } from "@/shared/types/api";
 import { Button } from "@/shared/ui/button";
 import {
   buildCustomerPayload, buildProjectPayload, customerToFormValues, emptyCustomerForm, emptyProjectForm,
-  applyAdminSearch, getAdminQueryWarning, getCachedQueryWarning, getInquiryAnchorHref, getSaveFailure, projectStatusLabels, projectStatuses, projectToFormValues,
+  applyAdminSearch, chooseRetry, getAdminQueryWarning, getCachedQueryWarning, getInquiryAnchorHref, getSaveFailure, projectStatusLabels, projectStatuses, projectToFormValues,
   resolveSelectedId,
   type AdminCustomerListState, type AdminProjectListState,
   type CustomerFormValues, type ProjectFormValues,
@@ -28,7 +28,6 @@ import {
 type Tab = "customers" | "projects";
 type DetailState<T> = { status: "idle" } | { status: "loading" } | { status: "success"; item: T; notice?: string; warning?: string; retry?: () => void } | { status: "error"; message: string };
 type LinkedState<T> = { status: "idle" } | { status: "loading" } | { status: "success"; item: T; warning?: string; retry?: () => void } | { status: "error"; message: string };
-const queryRetryRegistry = new Map<string, () => void>();
 
 export function AdminCustomerProjectManager() {
   const [tab, setTab] = useState<Tab>("customers");
@@ -126,7 +125,6 @@ export function toDetailState<T>(query: { data?: T; isPending: boolean; isError:
   if (query.isPending && !query.data) return { status: "loading" };
   if (query.isError && !query.data) return { status: "error", message: queryErrorMessage(query.error, "상세") };
   const warning = query.isError ? queryErrorMessage(query.error, "상세") : undefined;
-  if (warning && retry) queryRetryRegistry.set(warning, retry);
   return query.data ? { status: "success", item: query.data, notice, warning, retry } : { status: "loading" };
 }
 
@@ -135,7 +133,6 @@ function toLinkedState<T>(query: { data?: T; isPending: boolean; isError: boolea
   if (query.isPending && !query.data) return { status: "loading" };
   if (query.isError && !query.data) return { status: "error", message: queryErrorMessage(query.error, "연결 데이터") };
   const warning = query.isError ? queryErrorMessage(query.error, "연결 데이터") : undefined;
-  if (warning && retry) queryRetryRegistry.set(warning, retry);
   return query.data ? { status: "success", item: query.data, warning, retry } : { status: "loading" };
 }
 
@@ -170,7 +167,7 @@ function CustomerEditor({ detail, onDetailRetry, onSaved, linkedProject, linkedP
 
 function ProjectEditor({ detail, onDetailRetry, onSaved, linkedCustomer, linkedCustomerState, onLinkedCustomerRetry, onCustomer }: Readonly<{ detail: DetailState<AdminProjectDetail>; onDetailRetry: () => void; onSaved: (item: AdminProjectDetail) => void; linkedCustomer?: AdminCustomerDetail; linkedCustomerState: LinkedState<AdminCustomerDetail>; onLinkedCustomerRetry: () => void; onCustomer?: () => void }>) { const [values, setValues] = useState<ProjectFormValues>(emptyProjectForm); const [saving, setSaving] = useState(false); const [error, setError] = useState<string | null>(null); const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({}); useEffect(() => { if (detail.status === "success") queueMicrotask(() => { setValues(projectToFormValues(detail.item)); setError(null); }); }, [detail]); if (detail.status === "loading" || detail.status === "idle") return <EditorShell title="프로젝트 상세">{detail.status === "loading" ? <Loading /> : <EmptyEditor text="목록에서 프로젝트를 선택해 주세요." />}</EditorShell>; if (detail.status === "error") return <EditorShell title="프로젝트 상세"><ErrorText text={detail.message} /></EditorShell>; const item = detail.item; const save = async (event: React.FormEvent) => { event.preventDefault(); setSaving(true); setError(null); setFieldErrors({}); try { const response = await fetch(`/api/admin/projects/${item.id}`, { method: "PATCH", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify(buildProjectPayload(values)) }); const result = await response.json() as ApiResponse<AdminProjectDetail>; if (!response.ok || "error" in result) { if ("error" in result) { const failure = getSaveFailure(response.status, result, "프로젝트"); setError(failure.message); setFieldErrors(failure.fieldErrors); } else setError("프로젝트를 저장하지 못했습니다."); return; } onSaved(result.data); } catch { setError("네트워크 문제로 프로젝트를 저장하지 못했습니다."); } finally { setSaving(false); } }; return <EditorShell title={values.name || "프로젝트 상세"} notice={detail.notice} warning={detail.warning} onRetry={onDetailRetry}><form onSubmit={save} className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Field label="프로젝트명" value={values.name} error={fieldErrors.name} onChange={(value) => setValues({ ...values, name: value })} required disabled={saving} /><label className="grid gap-1 text-sm font-medium">상태<select value={values.status} onChange={(event) => setValues({ ...values, status: event.target.value as ProjectStatus })} disabled={saving} className="h-9 rounded-md border border-[#d8d1c6] bg-white px-2 font-normal outline-none focus:border-[#2e6f4f]">{projectStatuses.map((status) => <option key={status} value={status}>{projectStatusLabels[status]}</option>)}</select></label><Field label="계약 금액" type="number" value={values.contractAmount} error={fieldErrors.contractAmount} onChange={(value) => setValues({ ...values, contractAmount: value })} disabled={saving} /><Field label="예상 시작일" type="date" value={values.expectedStartDate.slice(0, 10)} error={fieldErrors.expectedStartDate} onChange={(value) => setValues({ ...values, expectedStartDate: value })} disabled={saving} /><Field label="예상 출시일" type="date" value={values.expectedLaunchDate.slice(0, 10)} error={fieldErrors.expectedLaunchDate} onChange={(value) => setValues({ ...values, expectedLaunchDate: value })} disabled={saving} /><Field label="출시일" type="datetime-local" value={values.launchedAt ? values.launchedAt.slice(0, 16) : ""} error={fieldErrors.launchedAt} onChange={(value) => setValues({ ...values, launchedAt: value })} disabled={saving} /></div><TextArea label="설명" value={values.description} error={fieldErrors.description} onChange={(value) => setValues({ ...values, description: value })} disabled={saving} /><TextArea label="메모" value={values.memo} error={fieldErrors.memo} onChange={(value) => setValues({ ...values, memo: value })} disabled={saving} /><Links customer={linkedCustomer} customerState={linkedCustomerState} onCustomer={onCustomer} onLinkedCustomerRetry={onLinkedCustomerRetry} inquiryId={item.inquiry_id} /><Button type="submit" disabled={saving}>{saving ? <Loader2 className="size-4 animate-spin" /> : null}변경사항 저장</Button>{error ? <p role="alert" className="text-sm text-[#912018]">{error}</p> : null}</form></EditorShell>; }
 
-function EditorShell({ title, notice, warning, onRetry, children }: Readonly<{ title: string; notice?: string; warning?: string; onRetry?: () => void; children: React.ReactNode }>) { return <div className="p-5 sm:p-6"><h3 className="text-xl font-semibold">{title}</h3>{notice ? <div role="status" className="mt-4 flex gap-2 rounded-md bg-[#edf7f0] p-3 text-sm text-[#23583f]"><CheckCircle2 aria-hidden className="size-4" />{notice}</div> : null}{warning ? <div className="mt-4"><QueryWarning message={warning} onRetry={onRetry ?? (() => queryRetryRegistry.get(warning)?.())} /></div> : null}<div className="mt-5">{children}</div></div>; }
+function EditorShell({ title, notice, warning, onRetry, children }: Readonly<{ title: string; notice?: string; warning?: string; onRetry?: () => void; children: React.ReactNode }>) { return <div className="p-5 sm:p-6"><h3 className="text-xl font-semibold">{title}</h3>{notice ? <div role="status" className="mt-4 flex gap-2 rounded-md bg-[#edf7f0] p-3 text-sm text-[#23583f]"><CheckCircle2 aria-hidden className="size-4" />{notice}</div> : null}{warning ? <div className="mt-4"><QueryWarning message={warning} onRetry={onRetry ?? (() => undefined)} /></div> : null}<div className="mt-5">{children}</div></div>; }
 function Loading() { return <div role="status" className="flex min-h-48 items-center gap-2 text-sm text-[#617068]"><Loader2 aria-hidden className="size-5 animate-spin" />상세 정보를 불러오는 중입니다.</div>; }
 function EmptyEditor({ text }: Readonly<{ text: string }>) { return <p className="py-12 text-sm text-[#617068]">{text}</p>; }
 function ErrorText({ text }: Readonly<{ text: string }>) { return <div role="alert" className="flex gap-2 rounded-md bg-[#fff1ee] p-3 text-sm text-[#912018]"><AlertCircle aria-hidden className="size-4" />{text}</div>; }
@@ -185,7 +182,7 @@ function Links({ inquiryId, customer, project, customerState, projectState, onCu
     {projectState?.status === "loading" ? <span role="status">연결 프로젝트를 불러오는 중입니다.</span> : null}
     {customerState?.status === "error" ? <span role="alert" className="text-[#912018]">{customerState.message}</span> : null}
     {projectState?.status === "error" ? <span role="alert" className="text-[#912018]">{projectState.message}</span> : null}
-    {customerState?.status === "success" && customerState.warning ? <QueryWarning message={customerState.warning} onRetry={() => onLinkedCustomerRetry?.() ?? customerState.retry?.()} /> : null}
-    {projectState?.status === "success" && projectState.warning ? <QueryWarning message={projectState.warning} onRetry={() => onLinkedProjectRetry?.() ?? projectState.retry?.()} /> : null}
+    {customerState?.status === "success" && customerState.warning ? <QueryWarning message={customerState.warning} onRetry={chooseRetry(onLinkedCustomerRetry, customerState.retry)} /> : null}
+    {projectState?.status === "success" && projectState.warning ? <QueryWarning message={projectState.warning} onRetry={chooseRetry(onLinkedProjectRetry, projectState.retry)} /> : null}
   </div>;
 }

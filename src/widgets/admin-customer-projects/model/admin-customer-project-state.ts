@@ -121,6 +121,10 @@ export function getCachedQueryWarning(hasData: boolean, isError: boolean, error:
   return hasData && isError ? getAdminQueryWarning(error, entity) : undefined;
 }
 
+export function chooseRetry(explicit?: () => void, fallback?: () => void) {
+  return explicit ?? fallback ?? (() => undefined);
+}
+
 export function customerToFormValues(customer: AdminCustomerDetail | AdminCustomerListItem): CustomerFormValues {
   return {
     name: customer.name,

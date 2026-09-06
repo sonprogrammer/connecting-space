@@ -8,7 +8,7 @@ import {
   parseAdminQueryResponse,
   type AdminQueryError,
 } from "../src/widgets/admin-customer-projects/model/admin-customer-project-queries";
-import { applyAdminSearch, getAdminQueryWarning, getCachedQueryWarning } from "../src/widgets/admin-customer-projects/model/admin-customer-project-state";
+import { applyAdminSearch, chooseRetry, getAdminQueryWarning, getCachedQueryWarning } from "../src/widgets/admin-customer-projects/model/admin-customer-project-state";
 
 describe("admin customer/project query model", () => {
   test("keeps list keys separate for every pagination and filter value", () => {
@@ -59,6 +59,15 @@ describe("admin customer/project query model", () => {
     assert.equal(getCachedQueryWarning(true, false, null, "고객"), undefined);
   });
 
+  test("chooses one explicit retry callback without invoking the fallback", () => {
+    let explicitCalls = 0;
+    let fallbackCalls = 0;
+    const retry = chooseRetry(() => { explicitCalls += 1; }, () => { fallbackCalls += 1; });
+    retry();
+    assert.equal(explicitCalls, 1);
+    assert.equal(fallbackCalls, 0);
+  });
+
   test("keeps project date validation messages wired to their fields", () => {
     const source = readFileSync("src/widgets/admin-customer-projects/ui/admin-customer-project-manager.tsx", "utf8");
     assert.match(source, /label="예상 시작일"[^\n]*error=\{fieldErrors\.expectedStartDate\}/);
@@ -67,5 +76,6 @@ describe("admin customer/project query model", () => {
     assert.match(source, /function ProjectPanel\([^\n]*onDetailRetry/);
     assert.match(source, /function ProjectEditor\([^\n]*onDetailRetry[^\n]*onLinkedCustomerRetry/);
     assert.match(source, /<ProjectEditor detail=\{detail\} onDetailRetry=\{onDetailRetry\}[^\n]*onLinkedCustomerRetry=\{onLinkedCustomerRetry\}/);
+    assert.doesNotMatch(source, /queryRetryRegistry/);
   });
 });
