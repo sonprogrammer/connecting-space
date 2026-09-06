@@ -64,5 +64,8 @@ describe("admin customer/project query model", () => {
     assert.match(source, /label="예상 시작일"[^\n]*error=\{fieldErrors\.expectedStartDate\}/);
     assert.match(source, /label="예상 출시일"[^\n]*error=\{fieldErrors\.expectedLaunchDate\}/);
     assert.match(source, /label="출시일"[^\n]*error=\{fieldErrors\.launchedAt\}/);
+    assert.match(source, /function ProjectPanel\([^\n]*onDetailRetry/);
+    assert.match(source, /function ProjectEditor\([^\n]*onDetailRetry[^\n]*onLinkedCustomerRetry/);
+    assert.match(source, /<ProjectEditor detail=\{detail\} onDetailRetry=\{onDetailRetry\}[^\n]*onLinkedCustomerRetry=\{onLinkedCustomerRetry\}/);
   });
 });
