@@ -22,10 +22,13 @@ import {
   emptyReceiptForm,
   formatPaymentAmount,
   formatPaymentDate,
+  formatSeoulDate,
   getPaymentDisplayStatus,
   paymentDisplayStatusLabels,
   paymentKindLabels,
   parsePositiveInteger,
+  receiptPayloadFingerprint,
+  resolveReceiptIdempotencyKey,
   type PaymentFormState,
   type ReceiptFormState,
 } from "../model/admin-project-payment-state";
@@ -72,7 +75,19 @@ function PaymentForm({
 function ReceiptForm({ paymentId, initial, editing, saving, onCancel, onSubmit }: { paymentId: string; initial?: ReceiptFormState; editing?: boolean; saving: boolean; onCancel?: () => void; onSubmit: (paymentId: string, form: ReceiptFormState) => Promise<boolean> }) {
   const [form, setForm] = useState(initial ?? emptyReceiptForm);
   const [error, setError] = useState<string>();
-  return <form aria-busy={saving} className="mt-3 grid gap-2 rounded-md bg-white p-3" onSubmit={async (event) => { event.preventDefault(); const message = amountErrorMessage(form.amount); if (message) { setError(message); return; } setError(undefined); if (await onSubmit(paymentId, form)) setForm(emptyReceiptForm()); }}>
+  const [submittedFingerprint, setSubmittedFingerprint] = useState<string>();
+  return <form aria-busy={saving} className="mt-3 grid gap-2 rounded-md bg-white p-3" onSubmit={async (event) => {
+    event.preventDefault();
+    const message = amountErrorMessage(form.amount);
+    if (message) { setError(message); return; }
+    setError(undefined);
+    const fingerprint = receiptPayloadFingerprint(form);
+    const idempotencyKey = resolveReceiptIdempotencyKey(form.idempotencyKey, submittedFingerprint, fingerprint);
+    setSubmittedFingerprint(fingerprint);
+    setForm((current) => ({ ...current, idempotencyKey }));
+    const succeeded = await onSubmit(paymentId, { ...form, idempotencyKey });
+    if (succeeded) { setForm(emptyReceiptForm()); setSubmittedFingerprint(undefined); }
+  }}>
     <div className="grid gap-2 sm:grid-cols-3"><label className="grid gap-1 text-xs font-medium">입금액<input aria-label="입금액" aria-invalid={Boolean(error)} inputMode="numeric" value={form.amount} disabled={saving} onChange={(event) => setForm({ ...form, amount: event.target.value })} className="h-8 rounded-md border border-[#d8d1c6] px-2" /></label><label className="grid gap-1 text-xs font-medium">입금일<input aria-label="입금일" type="date" value={form.receivedAt} disabled={saving} onChange={(event) => setForm({ ...form, receivedAt: event.target.value })} className="h-8 rounded-md border border-[#d8d1c6] px-2" /></label><label className="grid gap-1 text-xs font-medium">메모<input aria-label="입금 메모" value={form.memo} disabled={saving} onChange={(event) => setForm({ ...form, memo: event.target.value })} className="h-8 rounded-md border border-[#d8d1c6] px-2" /></label></div>
     {error ? <p role="alert" className="text-xs text-[#912018]">{error}</p> : null}<div className="flex gap-2"><Button type="submit" size="xs" disabled={saving}>{editing ? "입금 수정" : "입금 등록"}</Button>{onCancel ? <Button type="button" variant="outline" size="xs" disabled={saving} onClick={onCancel}>취소</Button> : null}</div>
   </form>;
@@ -82,7 +97,7 @@ function PaymentRowView({ payment, receipts, saving, onEdit, onDelete, onReceipt
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [editingReceiptId, setEditingReceiptId] = useState<string>();
   const displayStatus = getPaymentDisplayStatus(payment);
-  return <article className="rounded-lg border border-[#e5e9e2] p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h4 className="font-semibold">{paymentKindLabels[payment.kind]}</h4><span className="rounded-full bg-[#edf7f0] px-2 py-0.5 text-xs text-[#23583f]">{paymentDisplayStatusLabels[displayStatus]}</span></div><p className="mt-1 text-sm text-[#617068]">예정 {formatPaymentAmount(payment.amount)} · {formatPaymentDate(payment.due_date)}</p>{payment.memo ? <p className="mt-1 text-xs text-[#617068]">{payment.memo}</p> : null}</div><div className="flex gap-1"><Button type="button" variant="outline" size="xs" onClick={onEdit} disabled={saving}>수정</Button><Button type="button" variant="destructive" size="xs" onClick={onDelete} disabled={saving}>삭제</Button></div></div><div className="mt-3 grid gap-2 text-sm sm:grid-cols-3"><div>입금 완료 <strong>{formatPaymentAmount(payment.receivedAmount)}</strong></div><div>미수금 <strong>{formatPaymentAmount(payment.outstandingAmount)}</strong></div><div className="sm:text-right"><Button type="button" variant="outline" size="xs" onClick={() => setReceiptOpen(!receiptOpen)}>{receiptOpen ? "입금 접기" : "입금 관리"}</Button></div></div>{receipts.length > 0 ? <ul className="mt-3 space-y-2 border-t border-[#edf0ea] pt-2 text-xs text-[#617068]">{receipts.map((receipt) => editingReceiptId === receipt.id ? <li key={receipt.id}><ReceiptForm paymentId={payment.id} initial={{ amount: String(receipt.amount), receivedAt: receipt.received_at.slice(0, 10), memo: receipt.memo ?? "", idempotencyKey: crypto.randomUUID() }} editing saving={saving} onCancel={() => setEditingReceiptId(undefined)} onSubmit={async (_paymentId, form) => { const succeeded = await onUpdateReceipt(receipt.id, form); if (succeeded) setEditingReceiptId(undefined); return succeeded; }} /></li> : <li key={receipt.id} className="flex items-center justify-between gap-2"><span>{formatPaymentDate(receipt.received_at)} · {formatPaymentAmount(receipt.amount)}{receipt.memo ? ` · ${receipt.memo}` : ""}</span><span className="flex gap-1"><Button type="button" variant="ghost" size="xs" onClick={() => setEditingReceiptId(receipt.id)} disabled={saving}>수정</Button><Button type="button" variant="ghost" size="xs" onClick={() => onDeleteReceipt(receipt.id)} disabled={saving}>삭제</Button></span></li>)}</ul> : null}{receiptOpen ? <ReceiptForm paymentId={payment.id} saving={saving} onSubmit={onReceipt} /> : null}</article>;
+  return <article className="rounded-lg border border-[#e5e9e2] p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h4 className="font-semibold">{paymentKindLabels[payment.kind]}</h4><span className="rounded-full bg-[#edf7f0] px-2 py-0.5 text-xs text-[#23583f]">{paymentDisplayStatusLabels[displayStatus]}</span></div><p className="mt-1 text-sm text-[#617068]">예정 {formatPaymentAmount(payment.amount)} · {formatPaymentDate(payment.due_date)}</p>{payment.memo ? <p className="mt-1 text-xs text-[#617068]">{payment.memo}</p> : null}</div><div className="flex gap-1"><Button type="button" variant="outline" size="xs" onClick={onEdit} disabled={saving}>수정</Button><Button type="button" variant="destructive" size="xs" onClick={onDelete} disabled={saving}>삭제</Button></div></div><div className="mt-3 grid gap-2 text-sm sm:grid-cols-3"><div>입금 완료 <strong>{formatPaymentAmount(payment.receivedAmount)}</strong></div><div>미수금 <strong>{formatPaymentAmount(payment.outstandingAmount)}</strong></div><div className="sm:text-right"><Button type="button" variant="outline" size="xs" onClick={() => setReceiptOpen(!receiptOpen)}>{receiptOpen ? "입금 접기" : "입금 관리"}</Button></div></div>{receipts.length > 0 ? <ul className="mt-3 space-y-2 border-t border-[#edf0ea] pt-2 text-xs text-[#617068]">{receipts.map((receipt) => editingReceiptId === receipt.id ? <li key={receipt.id}><ReceiptForm paymentId={payment.id} initial={{ amount: String(receipt.amount), receivedAt: formatSeoulDate(receipt.received_at), memo: receipt.memo ?? "", idempotencyKey: crypto.randomUUID() }} editing saving={saving} onCancel={() => setEditingReceiptId(undefined)} onSubmit={async (_paymentId, form) => { const succeeded = await onUpdateReceipt(receipt.id, form); if (succeeded) setEditingReceiptId(undefined); return succeeded; }} /></li> : <li key={receipt.id} className="flex items-center justify-between gap-2"><span>{formatPaymentDate(receipt.received_at)} · {formatPaymentAmount(receipt.amount)}{receipt.memo ? ` · ${receipt.memo}` : ""}</span><span className="flex gap-1"><Button type="button" variant="ghost" size="xs" onClick={() => setEditingReceiptId(receipt.id)} disabled={saving}>수정</Button><Button type="button" variant="ghost" size="xs" onClick={() => onDeleteReceipt(receipt.id)} disabled={saving}>삭제</Button></span></li>)}</ul> : null}{receiptOpen ? <ReceiptForm paymentId={payment.id} saving={saving} onSubmit={onReceipt} /> : null}</article>;
 }
 
 export function ProjectPaymentManager({ projectId }: Props) {

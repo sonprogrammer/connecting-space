@@ -16,6 +16,9 @@ test("project payment manager keeps mutations project-scoped and exposes QA-crit
   assert.match(source, /aria-busy=\{saving\}/);
   assert.match(source, /if \(succeeded\) \{/);
   assert.match(source, /idempotencyKey: form\.idempotencyKey/);
+  assert.match(source, /resolveReceiptIdempotencyKey/);
+  assert.match(source, /formatSeoulDate\(receipt\.received_at\)/);
+  assert.match(source, /updatePaymentReceipt/);
   assert.match(source, /updatePaymentReceipt/);
 });
 

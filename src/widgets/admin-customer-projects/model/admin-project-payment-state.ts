@@ -48,16 +48,41 @@ export const emptyPaymentForm = (): PaymentFormState => ({
 
 export const emptyReceiptForm = (): ReceiptFormState => ({
   amount: "",
-  receivedAt: new Date().toISOString().slice(0, 10),
+  receivedAt: formatSeoulDate(new Date()),
   memo: "",
   idempotencyKey: crypto.randomUUID(),
 });
 
-export function getPaymentDisplayStatus(payment: Pick<PaymentRow, "status" | "amount"> & { receivedAmount: number; outstandingAmount: number }): PaymentDisplayStatus {
+export function getPaymentDisplayStatus(payment: Pick<PaymentRow, "status" | "amount" | "due_date"> & { receivedAmount: number; outstandingAmount: number }, today = new Date()): PaymentDisplayStatus {
   if (payment.status === "cancelled") return "cancelled";
-  if (payment.receivedAmount > 0 && payment.outstandingAmount > 0) return "partial";
   if (payment.outstandingAmount <= 0 && payment.receivedAmount >= payment.amount) return "paid";
+  if (payment.receivedAmount > 0 && payment.outstandingAmount > 0) return "partial";
+  if (payment.due_date && payment.due_date < formatSeoulDate(today)) return "overdue";
+  if (payment.status === "overdue") return "overdue";
   return payment.status;
+}
+
+export function formatSeoulDate(value: string | Date) {
+  const date = typeof value === "string" ? new Date(value) : value;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return year && month && day ? `${year}-${month}-${day}` : "";
+}
+
+export function receiptPayloadFingerprint(form: Pick<ReceiptFormState, "amount" | "receivedAt" | "memo">) {
+  return JSON.stringify([form.amount, form.receivedAt, form.memo]);
+}
+
+export function resolveReceiptIdempotencyKey(currentKey: string, previousFingerprint: string | undefined, nextFingerprint: string) {
+  if (previousFingerprint === undefined || previousFingerprint === nextFingerprint) return currentKey;
+  return crypto.randomUUID();
 }
 
 export function parsePositiveInteger(value: string) {
