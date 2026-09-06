@@ -191,6 +191,116 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["payment_receipts"]["Insert"]>;
         Relationships: [];
       };
+      quotes: {
+        Row: {
+          id: string;
+          inquiry_id: string;
+          status: Database["public"]["Enums"]["quote_status"];
+          latest_version_id: string | null;
+          approved_version_id: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          inquiry_id: string;
+          status?: Database["public"]["Enums"]["quote_status"];
+          latest_version_id?: string | null;
+          approved_version_id?: string | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["quotes"]["Insert"]>;
+        Relationships: [];
+      };
+      quote_versions: {
+        Row: {
+          id: string;
+          quote_id: string;
+          version_number: number;
+          title: string;
+          body: string;
+          scope_items: Json;
+          total_amount: number;
+          estimated_start_date: string | null;
+          estimated_end_date: string | null;
+          deposit_amount: number;
+          balance_amount: number;
+          deposit_terms: string;
+          balance_terms: string;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          quote_id: string;
+          version_number: number;
+          title: string;
+          body: string;
+          scope_items: Json;
+          total_amount: number;
+          estimated_start_date?: string | null;
+          estimated_end_date?: string | null;
+          deposit_amount: number;
+          balance_amount: number;
+          deposit_terms: string;
+          balance_terms: string;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["quote_versions"]["Insert"]>;
+        Relationships: [];
+      };
+      quote_approval_tokens: {
+        Row: {
+          id: string;
+          quote_version_id: string;
+          token_hash: string;
+          expires_at: string;
+          revoked_at: string | null;
+          used_at: string | null;
+          replaced_by_id: string | null;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          quote_version_id: string;
+          token_hash: string;
+          expires_at: string;
+          revoked_at?: string | null;
+          used_at?: string | null;
+          replaced_by_id?: string | null;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["quote_approval_tokens"]["Insert"]>;
+        Relationships: [];
+      };
+      quote_approvals: {
+        Row: {
+          id: string;
+          quote_id: string;
+          quote_version_id: string;
+          approval_token_id: string;
+          approved_at: string;
+          client_ip: string | null;
+          user_agent: string | null;
+        };
+        Insert: {
+          id?: string;
+          quote_id: string;
+          quote_version_id: string;
+          approval_token_id: string;
+          approved_at?: string;
+          client_ip?: string | null;
+          user_agent?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["quote_approvals"]["Insert"]>;
+        Relationships: [];
+      };
       portfolio_items: {
         Row: {
           id: string;
@@ -393,6 +503,97 @@ export type Database = {
           reused_project: boolean;
         }>;
       };
+      create_quote_with_version: {
+        Args: {
+          p_inquiry_id: string;
+          p_title: string;
+          p_body: string;
+          p_scope_items: Json;
+          p_total_amount: number;
+          p_estimated_start_date?: string | null;
+          p_estimated_end_date?: string | null;
+          p_deposit_amount: number;
+          p_balance_amount: number;
+          p_deposit_terms: string;
+          p_balance_terms: string;
+        };
+        Returns: Array<{
+          created_quote_id: string;
+          created_quote_version_id: string;
+          created_version_number: number;
+          created_status: Database["public"]["Enums"]["quote_status"];
+        }>;
+      };
+      create_quote_version: {
+        Args: {
+          p_quote_id: string;
+          p_title: string;
+          p_body: string;
+          p_scope_items: Json;
+          p_total_amount: number;
+          p_estimated_start_date?: string | null;
+          p_estimated_end_date?: string | null;
+          p_deposit_amount: number;
+          p_balance_amount: number;
+          p_deposit_terms: string;
+          p_balance_terms: string;
+        };
+        Returns: Array<{
+          created_quote_id: string;
+          created_quote_version_id: string;
+          created_version_number: number;
+          created_status: Database["public"]["Enums"]["quote_status"];
+        }>;
+      };
+      issue_quote_approval_token: {
+        Args: { p_quote_version_id: string; p_token_hash: string };
+        Returns: Array<{ issued_token_id: string; issued_expires_at: string }>;
+      };
+      revoke_quote_approval_token: {
+        Args: { p_quote_version_id: string };
+        Returns: Array<{ was_revoked: boolean }>;
+      };
+      cancel_quote: {
+        Args: { p_quote_id: string };
+        Returns: Array<{
+          cancelled_quote_id: string;
+          cancelled_status: Database["public"]["Enums"]["quote_status"];
+        }>;
+      };
+      get_public_quote_by_token: {
+        Args: { p_token_hash: string };
+        Returns: Array<{
+          availability: string;
+          quote_id: string | null;
+          quote_version_id: string | null;
+          version_number: number | null;
+          customer_name: string | null;
+          title: string | null;
+          body: string | null;
+          scope_items: Json | null;
+          total_amount: number | null;
+          estimated_start_date: string | null;
+          estimated_end_date: string | null;
+          deposit_amount: number | null;
+          balance_amount: number | null;
+          deposit_terms: string | null;
+          balance_terms: string | null;
+          expires_at: string | null;
+        }>;
+      };
+      approve_quote_by_token: {
+        Args: {
+          p_token_hash: string;
+          p_client_ip?: string | null;
+          p_user_agent?: string | null;
+        };
+        Returns: Array<{
+          result: string;
+          approved_quote_id: string | null;
+          approved_quote_version_id: string | null;
+          approved_at: string | null;
+        }>;
+      };
     };
     Enums: {
       inquiry_status: "new" | "contacted" | "qualified" | "converted" | "closed";
@@ -405,6 +606,7 @@ export type Database = {
         | "cancelled";
       payment_kind: "deposit" | "balance" | "extra";
       payment_status: "expected" | "paid" | "overdue" | "cancelled";
+      quote_status: "draft" | "sent" | "approved" | "expired" | "cancelled";
       ai_generation_kind:
         | "inquiry_reply"
         | "proposal"
