@@ -4,6 +4,7 @@ import type {
   CreatePaymentReceiptInput,
   PaymentReceiptRow,
   PaymentRow,
+  UpdatePaymentReceiptInput,
   UpdatePaymentInput,
 } from "@/entities/payment";
 import type { ApiResponse } from "@/shared/types/api";
@@ -64,6 +65,14 @@ export function createPaymentReceipt(
 
 export function deletePaymentReceipt(receiptId: string) {
   return fetchPayment<{ id: string }>(`/api/admin/payment-receipts/${receiptId}`, { method: "DELETE" });
+}
+
+export function updatePaymentReceipt(receiptId: string, input: UpdatePaymentReceiptInput) {
+  return fetchPayment<PaymentReceiptRow>(`/api/admin/payment-receipts/${receiptId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
 }
 
 export function paymentErrorMessage(error: unknown) {

@@ -6,6 +6,7 @@ import {
   createPayment,
   createPaymentReceipt,
   paymentErrorMessage,
+  updatePaymentReceipt,
 } from "../src/widgets/admin-customer-projects/model/admin-project-payment-queries";
 
 describe("admin project payment queries", () => {
@@ -32,14 +33,34 @@ describe("admin project payment queries", () => {
 
   test("uses one idempotency key for each receipt request", async () => {
     const originalFetch = globalThis.fetch;
-    let body: { idempotencyKey?: string } | undefined;
+    const bodies: Array<{ idempotencyKey?: string }> = [];
     globalThis.fetch = async (_input, init) => {
-      body = JSON.parse(String(init?.body)) as { idempotencyKey?: string };
+      bodies.push(JSON.parse(String(init?.body)) as { idempotencyKey?: string });
       return new Response(JSON.stringify({ data: { id: "receipt-1" } }), { status: 201 });
     };
     try {
-      await createPaymentReceipt("payment-1", { amount: 100000 });
-      assert.match(body?.idempotencyKey ?? "", /^[0-9a-f-]{36}$/);
+      const idempotencyKey = crypto.randomUUID();
+      await createPaymentReceipt("payment-1", { amount: 100000, idempotencyKey });
+      await createPaymentReceipt("payment-1", { amount: 100000, idempotencyKey });
+      assert.equal(bodies.length, 2);
+      assert.equal(bodies[0]?.idempotencyKey, idempotencyKey);
+      assert.equal(bodies[1]?.idempotencyKey, idempotencyKey);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("supports receipt updates without creating a new idempotency key", async () => {
+    const originalFetch = globalThis.fetch;
+    let request: { url: string; init?: RequestInit } | undefined;
+    globalThis.fetch = async (input, init) => {
+      request = { url: String(input), init };
+      return new Response(JSON.stringify({ data: { id: "receipt-1" } }), { status: 200 });
+    };
+    try {
+      await updatePaymentReceipt("receipt-1", { amount: 200000, memo: "수정" });
+      assert.equal(request?.url, "/api/admin/payment-receipts/receipt-1");
+      assert.deepEqual(JSON.parse(String(request?.init?.body)), { amount: 200000, memo: "수정" });
     } finally {
       globalThis.fetch = originalFetch;
     }

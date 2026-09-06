@@ -15,9 +15,11 @@ test("project payment manager keeps mutations project-scoped and exposes QA-crit
   assert.match(source, /aria-invalid=\{Boolean\(error\)\}/);
   assert.match(source, /aria-busy=\{saving\}/);
   assert.match(source, /if \(succeeded\) \{/);
+  assert.match(source, /idempotencyKey: form\.idempotencyKey/);
+  assert.match(source, /updatePaymentReceipt/);
 });
 
 test("project panel mounts payment management for the selected project", async () => {
   const source = await readFile(resolve("src/widgets/admin-customer-projects/ui/admin-customer-project-manager.tsx"), "utf8");
-  assert.match(source, /<ProjectPaymentManager projectId=\{selectedId\} \/>/);
+  assert.match(source, /<ProjectPaymentManager key=\{selectedId\} projectId=\{selectedId\} \/>/);
 });

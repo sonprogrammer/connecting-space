@@ -3,7 +3,9 @@ import { describe, test } from "node:test";
 
 import {
   amountErrorMessage,
+  getPaymentDisplayStatus,
   paymentKindLabels,
+  paymentDisplayStatusLabels,
   paymentStatusLabels,
   parsePositiveInteger,
   toCreatePaymentInput,
@@ -15,6 +17,7 @@ describe("admin project payment form state", () => {
     assert.equal(paymentKindLabels.balance, "잔금");
     assert.equal(paymentKindLabels.extra, "추가 비용");
     assert.equal(paymentStatusLabels.overdue, "미수");
+    assert.equal(paymentDisplayStatusLabels.partial, "부분 입금");
   });
 
   test("accepts only positive safe integer amounts", () => {
@@ -32,5 +35,13 @@ describe("admin project payment form state", () => {
       { kind: "balance", amount: 1000 },
     );
     assert.equal(toCreatePaymentInput({ kind: "deposit", amount: "abc", dueDate: "", memo: "" }), undefined);
+  });
+
+  test("derives partial and paid status from receipt balances", () => {
+    const payment = { status: "expected" as const, amount: 1000, receivedAmount: 400, outstandingAmount: 600 };
+    assert.equal(getPaymentDisplayStatus(payment), "partial");
+    assert.equal(getPaymentDisplayStatus({ ...payment, receivedAmount: 1000, outstandingAmount: 0 }), "paid");
+    assert.equal(getPaymentDisplayStatus({ ...payment, status: "overdue", receivedAmount: 0, outstandingAmount: 1000 }), "overdue");
+    assert.equal(getPaymentDisplayStatus({ ...payment, status: "cancelled" }), "cancelled");
   });
 });

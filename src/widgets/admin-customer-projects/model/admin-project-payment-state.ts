@@ -1,6 +1,7 @@
 import type {
   CreatePaymentInput,
   PaymentKind,
+  PaymentRow,
   PaymentStatus,
 } from "@/entities/payment";
 
@@ -17,6 +18,13 @@ export const paymentStatusLabels: Record<PaymentStatus, string> = {
   cancelled: "취소",
 };
 
+export type PaymentDisplayStatus = PaymentStatus | "partial";
+
+export const paymentDisplayStatusLabels: Record<PaymentDisplayStatus, string> = {
+  ...paymentStatusLabels,
+  partial: "부분 입금",
+};
+
 export type PaymentFormState = {
   kind: PaymentKind;
   amount: string;
@@ -28,6 +36,7 @@ export type ReceiptFormState = {
   amount: string;
   receivedAt: string;
   memo: string;
+  idempotencyKey: string;
 };
 
 export const emptyPaymentForm = (): PaymentFormState => ({
@@ -41,7 +50,15 @@ export const emptyReceiptForm = (): ReceiptFormState => ({
   amount: "",
   receivedAt: new Date().toISOString().slice(0, 10),
   memo: "",
+  idempotencyKey: crypto.randomUUID(),
 });
+
+export function getPaymentDisplayStatus(payment: Pick<PaymentRow, "status" | "amount"> & { receivedAmount: number; outstandingAmount: number }): PaymentDisplayStatus {
+  if (payment.status === "cancelled") return "cancelled";
+  if (payment.receivedAmount > 0 && payment.outstandingAmount > 0) return "partial";
+  if (payment.outstandingAmount <= 0 && payment.receivedAmount >= payment.amount) return "paid";
+  return payment.status;
+}
 
 export function parsePositiveInteger(value: string) {
   const normalized = value.trim();
