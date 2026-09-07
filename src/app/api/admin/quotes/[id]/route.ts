@@ -61,10 +61,26 @@ export async function GET(request: NextRequest, context: Context) {
     return jsonError("ADMIN_QUOTE_READ_FAILED", "Failed to read quote", 500);
   }
 
+  const deliveriesResult = versionIds.length
+    ? await verified.supabase.from("quote_email_deliveries")
+        .select("id,quote_id,quote_version_id,approval_token_id,generation,status,attempt_count,max_attempts,available_at,sent_at,error_code,superseded_at,created_at")
+        .in("quote_version_id", versionIds).order("created_at", { ascending: false })
+    : { data: [], error: null };
+  if (deliveriesResult.error) return jsonError("ADMIN_QUOTE_READ_FAILED", "Failed to read quote", 500);
+
+  const tokenIds = (tokensResult.data ?? []).map((token) => token.id);
+  const alertsResult = tokenIds.length
+    ? await verified.supabase.from("quote_expiration_alerts")
+        .select("approval_token_id,status").in("approval_token_id", tokenIds)
+    : { data: [], error: null };
+  if (alertsResult.error) return jsonError("ADMIN_QUOTE_READ_FAILED", "Failed to read quote", 500);
+
   return jsonOk<AdminQuoteDetail>({
     quote: quoteResult.data,
     versions: versionsResult.data ?? [],
     tokens: tokensResult.data ?? [],
     approvals: approvalsResult.data ?? [],
+    emailDeliveries: deliveriesResult.data ?? [],
+    expirationAlerts: alertsResult.data ?? [],
   });
 }
