@@ -76,6 +76,28 @@ export function assertSlackEnv() {
   };
 }
 
+export function assertQuoteEmailEnv() {
+  const values = requireEnvironmentVariables({
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    RESEND_FROM_EMAIL: process.env.RESEND_FROM_EMAIL,
+    QUOTE_EMAIL_ENCRYPTION_KEY: process.env.QUOTE_EMAIL_ENCRYPTION_KEY,
+    QUOTE_PUBLIC_BASE_URL: process.env.QUOTE_PUBLIC_BASE_URL,
+  });
+  if (Buffer.from(values.QUOTE_EMAIL_ENCRYPTION_KEY, "base64").length !== 32) {
+    throw new Error("QUOTE_EMAIL_ENCRYPTION_KEY must be a base64-encoded 32-byte key");
+  }
+  const publicBaseUrl = new URL(values.QUOTE_PUBLIC_BASE_URL);
+  if (publicBaseUrl.protocol !== "https:" && publicBaseUrl.protocol !== "http:") {
+    throw new Error("QUOTE_PUBLIC_BASE_URL must use http or https");
+  }
+  return {
+    apiKey: values.RESEND_API_KEY,
+    fromEmail: values.RESEND_FROM_EMAIL,
+    encryptionKey: values.QUOTE_EMAIL_ENCRYPTION_KEY,
+    publicBaseUrl: publicBaseUrl.origin,
+  };
+}
+
 export function assertAutomationProcessEnv() {
   const values = requireEnvironmentVariables({
     AUTOMATION_PROCESS_SECRET: process.env.AUTOMATION_PROCESS_SECRET,

@@ -15,6 +15,7 @@ import { nextFailureState, redactAutomationError } from "../src/shared/lib/autom
 import {
   assertAiEnv,
   assertAutomationProcessEnv,
+  assertQuoteEmailEnv,
   assertSlackEnv,
 } from "../src/shared/config/env";
 
@@ -26,6 +27,10 @@ const automationEnvNames = [
   "SLACK_INQUIRY_WEBHOOK_URL",
   "AUTOMATION_PROCESS_SECRET",
   "ADMIN_BASE_URL",
+  "RESEND_API_KEY",
+  "RESEND_FROM_EMAIL",
+  "QUOTE_EMAIL_ENCRYPTION_KEY",
+  "QUOTE_PUBLIC_BASE_URL",
 ] as const;
 
 function withAutomationEnv(
@@ -103,6 +108,26 @@ describe("provider-neutral AI inquiry reply", () => {
     assert.equal(resolveAiProviderConfig({ provider: "openai", apiKey: "key", model: "model" }).baseUrl, "https://api.openai.com/v1");
     assert.equal(resolveAiProviderConfig({ provider: "custom", apiKey: "key", model: "model", baseUrl: "https://ai.example.com/v1/" }).baseUrl, "https://ai.example.com/v1");
     assert.throws(() => resolveAiProviderConfig({ provider: "custom", apiKey: "key", model: "model" }));
+  });
+
+  it("validates quote email credentials and trusted public URL together", () => {
+    const encryptionKey = Buffer.alloc(32, 9).toString("base64");
+    withAutomationEnv({
+      RESEND_API_KEY: "test-resend-key",
+      RESEND_FROM_EMAIL: "sender@example.invalid",
+      QUOTE_EMAIL_ENCRYPTION_KEY: encryptionKey,
+      QUOTE_PUBLIC_BASE_URL: "https://quote.example.test/path",
+    }, () => {
+      assert.deepEqual(assertQuoteEmailEnv(), {
+        apiKey: "test-resend-key",
+        fromEmail: "sender@example.invalid",
+        encryptionKey,
+        publicBaseUrl: "https://quote.example.test",
+      });
+    });
+    withAutomationEnv({ QUOTE_EMAIL_ENCRYPTION_KEY: "short" }, () => {
+      assert.throws(() => assertQuoteEmailEnv());
+    });
   });
 
   it("sends a portable chat-completions JSON schema request", async () => {
