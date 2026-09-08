@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { jsonError, jsonOk } from "@/shared/api/response";
 import { assertAutomationProcessEnv } from "@/shared/config/env";
 import { processAutomationJobs } from "@/shared/lib/automation/processor";
+import { processQuoteNotifications } from "@/shared/lib/automation/quote-notification-processor";
 
 function isAuthorized(request: Request, expected: string) {
   const supplied = request.headers.get("x-automation-secret") ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
@@ -24,6 +25,7 @@ export async function processAutomationRequest(
   request: Request,
   parseBody: boolean,
   processJobs: typeof processAutomationJobs = processAutomationJobs,
+  processQuoteJobs: typeof processQuoteNotifications = processQuoteNotifications,
 ) {
   let env: ReturnType<typeof assertAutomationProcessEnv>;
   try {
@@ -41,12 +43,22 @@ export async function processAutomationRequest(
     ? Math.max(1, Math.min(body.limit, 20))
     : 5;
   try {
-    const results = await processJobs({ limit });
+    const [inquiryOutcome, quoteOutcome] = await Promise.allSettled([
+      processJobs({ limit }),
+      processQuoteJobs({ limit }),
+    ]);
+    const quoteResults = quoteOutcome.status === "fulfilled" ? quoteOutcome.value : [{
+      id: "quote-notifications", status: "failed" as const, error: "QUOTE_NOTIFICATION_PROCESSING_FAILED",
+    }];
+    if (inquiryOutcome.status === "rejected") {
+      return jsonError("AUTOMATION_PROCESS_FAILED", "Failed to process automation jobs", 500);
+    }
+    const results = inquiryOutcome.value;
     const missing = [...new Set(results.flatMap((result) => missingSlackVariables(result.error)))];
     if (missing.length) {
       return jsonError("SLACK_NOT_CONFIGURED", "Slack notification configuration is missing", 503, { missing });
     }
-    return jsonOk({ results });
+    return jsonOk({ results, quoteResults });
   } catch {
     return jsonError("AUTOMATION_PROCESS_FAILED", "Failed to process automation jobs", 500);
   }

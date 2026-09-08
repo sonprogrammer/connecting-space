@@ -49,7 +49,7 @@ describe("automation process route", { concurrency: false }, () => {
       method: "POST",
       headers: { authorization: "Bearer route-test-secret", "content-type": "application/json" },
       body: JSON.stringify({ limit: 1 }),
-    }), true, processJobs);
+    }), true, processJobs, async () => []);
     assert.equal(response.status, 503);
     assert.deepEqual(await response.json(), {
       error: {
@@ -58,5 +58,38 @@ describe("automation process route", { concurrency: false }, () => {
         details: { missing: ["SLACK_INQUIRY_WEBHOOK_URL", "ADMIN_BASE_URL"] },
       },
     });
+  });
+
+  it("문의 자동화와 견적 알림 processor를 독립적으로 실행한다", async () => {
+    process.env.AUTOMATION_PROCESS_SECRET = "route-test-secret";
+    const { processAutomationRequest } = await import("../src/shared/lib/automation/process-route");
+    let quoteProcessorCalled = false;
+    const response = await processAutomationRequest(new Request("https://example.test/api/internal/automation/process", {
+      method: "POST", headers: { authorization: "Bearer route-test-secret", "content-type": "application/json" },
+      body: JSON.stringify({ limit: 2 }),
+    }), true, async () => [{ id: "inquiry-job", status: "completed" as const }], async () => {
+      quoteProcessorCalled = true;
+      return [{ id: "quote-job", status: "sent" as const }];
+    });
+    assert.equal(response.status, 200);
+    assert.equal(quoteProcessorCalled, true);
+    assert.deepEqual((await response.json()).data, {
+      results: [{ id: "inquiry-job", status: "completed" }],
+      quoteResults: [{ id: "quote-job", status: "sent" }],
+    });
+  });
+
+  it("문의 processor가 실패해도 견적 processor 실행을 막지 않는다", async () => {
+    process.env.AUTOMATION_PROCESS_SECRET = "route-test-secret";
+    const { processAutomationRequest } = await import("../src/shared/lib/automation/process-route");
+    let quoteProcessorCalled = false;
+    const response = await processAutomationRequest(new Request("https://example.test/api/internal/automation/process", {
+      method: "POST", headers: { authorization: "Bearer route-test-secret" },
+    }), false, async () => { throw new Error("inquiry failed"); }, async () => {
+      quoteProcessorCalled = true;
+      return [];
+    });
+    assert.equal(quoteProcessorCalled, true);
+    assert.equal(response.status, 500);
   });
 });

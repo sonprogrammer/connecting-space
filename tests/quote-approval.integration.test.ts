@@ -98,6 +98,10 @@ describe("로컬 견적 승인 PostgreSQL 통합", { skip: !enabled }, () => {
     const firstExpiry = Date.parse(firstIssue.data?.[0]?.issued_expires_at ?? "");
     assert.ok(firstExpiry - firstIssueStartedAt >= 7 * 24 * 60 * 60 * 1000 - 5_000);
     assert.ok(firstExpiry - firstIssueStartedAt <= 7 * 24 * 60 * 60 * 1000 + 5_000);
+    assert.equal(
+      (await service.from("quotes").update({ status: "sent" }).eq("id", quoteId)).error,
+      null,
+    );
 
     const firstPublicRead = await anon.rpc("get_public_quote_by_token", {
       p_token_hash: firstToken.tokenHash,
@@ -178,6 +182,10 @@ describe("로컬 견적 승인 PostgreSQL 통합", { skip: !enabled }, () => {
       p_token_hash: expiringToken.tokenHash,
     });
     assert.equal(expiringIssue.error, null, expiringIssue.error?.message);
+    assert.equal(
+      (await service.from("quotes").update({ status: "sent" }).eq("id", quoteId)).error,
+      null,
+    );
     assert.equal(
       (
         await service

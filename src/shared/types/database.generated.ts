@@ -258,7 +258,7 @@ export type Database = {
           id: string;
           quote_version_id: string;
           token_hash: string;
-          expires_at: string;
+          expires_at: string | null;
           revoked_at: string | null;
           used_at: string | null;
           replaced_by_id: string | null;
@@ -269,7 +269,7 @@ export type Database = {
           id?: string;
           quote_version_id: string;
           token_hash: string;
-          expires_at: string;
+          expires_at?: string | null;
           revoked_at?: string | null;
           used_at?: string | null;
           replaced_by_id?: string | null;
@@ -299,6 +299,46 @@ export type Database = {
           user_agent?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["quote_approvals"]["Insert"]>;
+        Relationships: [];
+      };
+      quote_email_deliveries: {
+        Row: {
+          id: string; quote_id: string; quote_version_id: string; approval_token_id: string;
+          generation: number; status: Database["public"]["Enums"]["quote_delivery_status"];
+          encrypted_payload: string; payload_nonce: string; payload_auth_tag: string;
+          attempt_count: number; max_attempts: number; available_at: string;
+          locked_at: string | null; locked_by: string | null; provider_message_id: string | null;
+          dispatch_started_at: string | null; error_code: string | null; sent_at: string | null;
+          completed_at: string | null; superseded_at: string | null; created_at: string; updated_at: string;
+        };
+        Insert: {
+          id: string; quote_id: string; quote_version_id: string; approval_token_id: string;
+          generation: number; status?: Database["public"]["Enums"]["quote_delivery_status"];
+          encrypted_payload: string; payload_nonce: string; payload_auth_tag: string;
+          attempt_count?: number; max_attempts?: number; available_at?: string;
+          locked_at?: string | null; locked_by?: string | null; provider_message_id?: string | null;
+          dispatch_started_at?: string | null; error_code?: string | null; sent_at?: string | null;
+          completed_at?: string | null; superseded_at?: string | null; created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["quote_email_deliveries"]["Insert"]>;
+        Relationships: [];
+      };
+      quote_expiration_alerts: {
+        Row: {
+          id: string; quote_id: string; quote_version_id: string; approval_token_id: string;
+          status: Database["public"]["Enums"]["quote_delivery_status"];
+          attempt_count: number; max_attempts: number; available_at: string;
+          locked_at: string | null; locked_by: string | null; error_code: string | null;
+          sent_at: string | null; completed_at: string | null; created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; quote_id: string; quote_version_id: string; approval_token_id: string;
+          status?: Database["public"]["Enums"]["quote_delivery_status"];
+          attempt_count?: number; max_attempts?: number; available_at?: string;
+          locked_at?: string | null; locked_by?: string | null; error_code?: string | null;
+          sent_at?: string | null; completed_at?: string | null; created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["quote_expiration_alerts"]["Insert"]>;
         Relationships: [];
       };
       portfolio_items: {
@@ -594,6 +634,45 @@ export type Database = {
           approved_at: string | null;
         }>;
       };
+      enqueue_quote_email_delivery: {
+        Args: {
+          p_job_id: string; p_quote_version_id: string; p_token_id: string; p_token_hash: string;
+          p_encrypted_payload: string; p_payload_nonce: string; p_payload_auth_tag: string; p_now?: string;
+        };
+        Returns: Array<{ result: string; delivery: Database["public"]["Tables"]["quote_email_deliveries"]["Row"] }>;
+      };
+      claim_quote_email_deliveries: {
+        Args: { p_worker_id: string; p_limit?: number; p_now?: string };
+        Returns: Database["public"]["Tables"]["quote_email_deliveries"]["Row"][];
+      };
+      finalize_quote_email_delivery: {
+        Args: { p_job_id: string; p_provider_message_id: string; p_sent_at?: string };
+        Returns: Database["public"]["Tables"]["quote_email_deliveries"]["Row"];
+      };
+      fail_quote_email_delivery: {
+        Args: { p_job_id: string; p_error_code: string; p_now?: string };
+        Returns: Database["public"]["Tables"]["quote_email_deliveries"]["Row"];
+      };
+      retry_quote_email_delivery: {
+        Args: { p_job_id: string; p_now?: string };
+        Returns: Array<{ result: string; delivery: Database["public"]["Tables"]["quote_email_deliveries"]["Row"] }>;
+      };
+      schedule_quote_lifecycle: {
+        Args: { p_now?: string };
+        Returns: Array<{ expired_count: number; alert_count: number }>;
+      };
+      claim_quote_expiration_alerts: {
+        Args: { p_worker_id: string; p_limit?: number; p_now?: string };
+        Returns: Database["public"]["Tables"]["quote_expiration_alerts"]["Row"][];
+      };
+      finalize_quote_expiration_alert: {
+        Args: { p_alert_id: string; p_sent_at?: string };
+        Returns: Database["public"]["Tables"]["quote_expiration_alerts"]["Row"];
+      };
+      fail_quote_expiration_alert: {
+        Args: { p_alert_id: string; p_error_code: string; p_now?: string };
+        Returns: Database["public"]["Tables"]["quote_expiration_alerts"]["Row"];
+      };
     };
     Enums: {
       inquiry_status: "new" | "contacted" | "qualified" | "converted" | "closed";
@@ -607,6 +686,7 @@ export type Database = {
       payment_kind: "deposit" | "balance" | "extra";
       payment_status: "expected" | "paid" | "overdue" | "cancelled";
       quote_status: "draft" | "sent" | "approved" | "expired" | "cancelled";
+      quote_delivery_status: "queued" | "processing" | "retry" | "sent" | "failed";
       ai_generation_kind:
         | "inquiry_reply"
         | "proposal"

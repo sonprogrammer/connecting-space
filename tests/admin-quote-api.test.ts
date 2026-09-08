@@ -144,7 +144,15 @@ describe("관리자 문의·견적 API", () => {
       created_by: inquiryId,
       created_at: "2026-09-06T00:00:00Z",
     };
-    const fake = createTestClient([ok(quote), ok([version]), ok([token]), ok([])]);
+    const delivery = {
+      id: "55555555-5555-4555-8555-555555555555", quote_id: quoteId,
+      quote_version_id: versionId, approval_token_id: tokenId, generation: 1,
+      status: "sent", attempt_count: 1, max_attempts: 3,
+      available_at: "2026-09-06T00:00:00Z", sent_at: "2026-09-06T00:00:01Z",
+      error_code: null, superseded_at: null, created_at: "2026-09-06T00:00:00Z",
+    };
+    const alert = { approval_token_id: tokenId, status: "queued" };
+    const fake = createTestClient([ok(quote), ok([version]), ok([token]), ok([]), ok([delivery]), ok([alert])]);
     verifiedAdmin = { ok: true, supabase: fake.client };
 
     const response = await quoteDetailRoute.GET(
@@ -152,12 +160,18 @@ describe("관리자 문의·견적 API", () => {
       context(quoteId),
     );
     assert.equal(response.status, 200);
-    assert.deepEqual((await response.json()).data.tokens, [token]);
+    const data = (await response.json()).data;
+    assert.deepEqual(data.tokens, [token]);
+    assert.deepEqual(data.emailDeliveries, [delivery]);
+    assert.deepEqual(data.expirationAlerts, [alert]);
     const tokenRequest = fake.requests.find((request) =>
       new URL(request.url).pathname.endsWith("/quote_approval_tokens"),
     );
     assert.ok(tokenRequest);
     assert.doesNotMatch(new URL(tokenRequest.url).searchParams.get("select") ?? "", /token_hash/);
+    const deliveryRequest = fake.requests.find((request) => new URL(request.url).pathname.endsWith("/quote_email_deliveries"));
+    assert.ok(deliveryRequest);
+    assert.doesNotMatch(new URL(deliveryRequest.url).searchParams.get("select") ?? "", /encrypted_payload|payload_nonce|payload_auth_tag|provider_message_id|locked_/);
   });
 });
 
