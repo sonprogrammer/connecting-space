@@ -108,22 +108,124 @@ describe("로컬 견적 이메일 PostgreSQL 통합", { skip: !enabled }, () => 
     assert.equal(retry.data?.[0]?.delivery.id, reissuedJob?.id);
     assert.equal(retry.data?.[0]?.delivery.approval_token_id, reissuedJob?.approval_token_id);
 
+    for (const minute of [1, 2, 4]) {
+      const now = `2026-09-15T04:0${minute}:00.000Z`;
+      const claim = await service.rpc("claim_quote_email_deliveries", { p_worker_id: "integration", p_limit: 20, p_now: now });
+      assert.equal(claim.data?.some((row) => row.id === reissuedJob?.id), true);
+      assert.equal((await service.rpc("fail_quote_email_delivery", {
+        p_job_id: reissuedJob!.id, p_error_code: "SAFE_ERROR", p_now: now,
+      })).error, null);
+    }
+    const staleRetryAt = "2026-09-16T03:01:00.000Z";
+    const staleRetry = await admin.rpc("retry_quote_email_delivery", {
+      p_job_id: reissuedJob!.id, p_now: staleRetryAt,
+    });
+    assert.equal(staleRetry.data?.[0]?.result, "reissue_required");
+    const staleJob = await service.from("quote_email_deliveries")
+      .select("superseded_at").eq("id", reissuedJob!.id).single();
+    const staleToken = await service.from("quote_approval_tokens")
+      .select("revoked_at").eq("id", reissuedJob!.approval_token_id).single();
+    assert.equal(staleJob.data?.superseded_at, "2026-09-16T03:01:00+00:00");
+    assert.equal(staleToken.data?.revoked_at, "2026-09-16T03:01:00+00:00");
+
+    const freshArgs = enqueueArgs(versionId, "fresh encrypted generation", "2026-09-16T03:02:00.000Z");
+    const fresh = await admin.rpc("enqueue_quote_email_delivery", freshArgs);
+    assert.equal(fresh.data?.[0]?.result, "created");
+    const freshJob = fresh.data?.[0]?.delivery;
+    assert.equal(freshJob?.generation, 3);
+
+    assert.equal((await service.from("quote_email_deliveries").update({
+      status: "processing", attempt_count: 1, locked_at: "2026-09-16T03:03:00.000Z",
+      locked_by: "dead-worker", dispatch_started_at: "2026-09-16T03:03:00.000Z",
+    }).eq("id", freshJob!.id)).error, null);
+    const reclaimed = await service.rpc("claim_quote_email_deliveries", {
+      p_worker_id: "recovery-worker", p_limit: 20, p_now: "2026-09-16T03:09:00.000Z",
+    });
+    assert.equal(reclaimed.data?.find((row) => row.id === freshJob?.id)?.attempt_count, 2);
+
+    assert.equal((await service.from("quote_email_deliveries").update({
+      status: "processing", attempt_count: 3, locked_at: "2026-09-16T03:09:00.000Z", locked_by: "dead-worker",
+    }).eq("id", freshJob!.id)).error, null);
+    const exhaustedClaim = await service.rpc("claim_quote_email_deliveries", {
+      p_worker_id: "recovery-worker", p_limit: 20, p_now: "2026-09-16T03:15:00.000Z",
+    });
+    assert.equal(exhaustedClaim.data?.some((row) => row.id === freshJob?.id), false);
+    const exhaustedJob = await service.from("quote_email_deliveries")
+      .select("status,locked_at,locked_by,error_code").eq("id", freshJob!.id).single();
+    assert.deepEqual(exhaustedJob.data, {
+      status: "failed", locked_at: null, locked_by: null, error_code: "QUOTE_EMAIL_WORKER_LOCK_EXPIRED",
+    });
+
+    assert.equal((await admin.rpc("retry_quote_email_delivery", {
+      p_job_id: freshJob!.id, p_now: "2026-09-16T03:16:00.000Z",
+    })).data?.[0]?.result, "requeued");
+    const agedClaimAt = "2026-09-17T03:03:00.000Z";
+    const agedClaim = await service.rpc("claim_quote_email_deliveries", {
+      p_worker_id: "recovery-worker", p_limit: 20, p_now: agedClaimAt,
+    });
+    assert.equal(agedClaim.data?.some((row) => row.id === freshJob?.id), false);
+    assert.equal((await service.from("quote_email_deliveries").select("superseded_at")
+      .eq("id", freshJob!.id).single()).data?.superseded_at, "2026-09-17T03:03:00+00:00");
+    assert.equal((await service.from("quote_approval_tokens").select("revoked_at")
+      .eq("id", freshJob!.approval_token_id).single()).data?.revoked_at, "2026-09-17T03:03:00+00:00");
+
+    const deliveredArgs = enqueueArgs(versionId, "deliverable encrypted generation", "2026-09-17T04:00:00.000Z");
+    const delivered = await admin.rpc("enqueue_quote_email_delivery", deliveredArgs);
+    const deliveredJob = delivered.data?.[0]?.delivery;
+    assert.equal(deliveredJob?.generation, 4);
+    const deliveredAt = "2026-09-17T04:01:00.000Z";
+    assert.equal((await service.rpc("claim_quote_email_deliveries", {
+      p_worker_id: "integration", p_limit: 20, p_now: deliveredAt,
+    })).data?.some((row) => row.id === deliveredJob?.id), true);
+    assert.equal((await service.rpc("finalize_quote_email_delivery", {
+      p_job_id: deliveredJob!.id, p_provider_message_id: "provider-generation-four", p_sent_at: deliveredAt,
+    })).error, null);
+    const deliveredExpiry = (await service.from("quote_approval_tokens").select("expires_at")
+      .eq("id", deliveredJob!.approval_token_id).single()).data?.expires_at;
+    assert.equal(deliveredExpiry, "2026-09-24T04:01:00+00:00");
+
+    const alertSchedule = await service.rpc("schedule_quote_lifecycle", { p_now: "2026-09-23T12:00:00.000Z" });
+    assert.equal(alertSchedule.data?.[0]?.alert_count, 1);
+    const alert = await service.from("quote_expiration_alerts").select("id")
+      .eq("approval_token_id", deliveredJob!.approval_token_id).single();
+    assert.ok(alert.data?.id);
+    assert.equal((await service.from("quote_expiration_alerts").update({
+      status: "processing", attempt_count: 1, locked_at: "2026-09-23T12:00:00.000Z", locked_by: "dead-worker",
+    }).eq("id", alert.data.id)).error, null);
+    const reclaimedAlert = await service.rpc("claim_quote_expiration_alerts", {
+      p_worker_id: "recovery-worker", p_limit: 20, p_now: "2026-09-23T12:06:00.000Z",
+    });
+    assert.equal(reclaimedAlert.data?.find((row) => row.id === alert.data?.id)?.attempt_count, 2);
+
+    assert.equal((await service.from("quote_expiration_alerts").update({
+      status: "processing", attempt_count: 3, locked_at: "2026-09-23T12:06:00.000Z", locked_by: "dead-worker",
+    }).eq("id", alert.data.id)).error, null);
+    const exhaustedAlertClaim = await service.rpc("claim_quote_expiration_alerts", {
+      p_worker_id: "recovery-worker", p_limit: 20, p_now: "2026-09-23T12:12:00.000Z",
+    });
+    assert.equal(exhaustedAlertClaim.data?.some((row) => row.id === alert.data?.id), false);
+    const exhaustedAlert = await service.from("quote_expiration_alerts")
+      .select("status,locked_at,locked_by,error_code").eq("id", alert.data.id).single();
+    assert.deepEqual(exhaustedAlert.data, {
+      status: "failed", locked_at: null, locked_by: null, error_code: "QUOTE_EXPIRATION_WORKER_LOCK_EXPIRED",
+    });
+
     const rollback = enqueueArgs(versionId, "rollback");
     rollback.p_payload_nonce = "";
-    await service.from("quote_email_deliveries").update({ superseded_at: "2026-09-15T05:00:00.000Z" }).eq("id", reissuedJob!.id);
-    await service.from("quote_approval_tokens").update({ revoked_at: "2026-09-15T05:00:00.000Z" }).eq("id", reissuedJob!.approval_token_id);
+    await service.from("quote_approval_tokens").update({ revoked_at: "2026-09-24T05:00:00.000Z" })
+      .eq("id", deliveredJob!.approval_token_id);
     const invalid = await admin.rpc("enqueue_quote_email_delivery", rollback);
     assert.notEqual(invalid.error, null);
     assert.equal((await service.from("quote_approval_tokens").select("id", { count: "exact", head: true }).eq("id", rollback.p_token_id)).count, 0);
   });
 });
 
-function enqueueArgs(versionId: string, ciphertext: string) {
+function enqueueArgs(versionId: string, ciphertext: string, now = "2026-09-07T02:59:00.000Z") {
   const token = createApprovalToken();
   return {
     p_job_id: randomUUID(), p_quote_version_id: versionId, p_token_id: randomUUID(), p_token_hash: token.tokenHash,
     p_encrypted_payload: Buffer.from(ciphertext).toString("base64"), p_payload_nonce: Buffer.alloc(12, 1).toString("base64"),
-    p_payload_auth_tag: Buffer.alloc(16, 2).toString("base64"), p_now: "2026-09-07T02:59:00.000Z",
+    p_payload_auth_tag: Buffer.alloc(16, 2).toString("base64"), p_now: now,
   };
 }
 

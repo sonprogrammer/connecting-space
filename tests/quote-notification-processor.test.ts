@@ -45,7 +45,10 @@ describe("견적 알림 worker", () => {
     assert.equal(result.status, "sent");
     assert.equal(requests[0].key, `quote-approval/${jobId}`);
     assert.match(requests[0].body, /2026년 9월 14일/);
-    assert.equal(fake.rpcCalls.some((call) => call.name === "finalize_quote_email_delivery"), true);
+    assert.deepEqual(fake.rpcCalls.find((call) => call.name === "finalize_quote_email_delivery"), {
+      name: "finalize_quote_email_delivery",
+      args: { p_job_id: jobId, p_provider_message_id: "provider-id", p_sent_at: dispatchAt },
+    });
   });
 
   it("무효 토큰은 Resend를 호출하지 않고 안전한 실패 코드를 기록한다", async () => {

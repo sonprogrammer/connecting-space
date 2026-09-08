@@ -34,6 +34,8 @@
 2. `POST /api/admin/quote-email-jobs/{jobId}/retry`를 호출해 `202`를 받고, 작업·토큰·generation이 바뀌지 않는지 확인한다.
 3. 실패 작업에 `/send`를 다시 호출하면 새 메일을 만들지 않고 `409 QUOTE_EMAIL_RETRY_REQUIRED`인지 확인한다.
 4. 만료·폐기된 토큰은 retry가 `409 QUOTE_EMAIL_REISSUE_REQUIRED`이고, `/send` 호출 시 같은 견적 버전에 다음 generation과 새 토큰이 만들어지는지 확인한다.
+5. 최초 dispatch 뒤 24시간 경계 전에는 동일 작업 retry가 가능하고, 경계 시각부터는 `409 QUOTE_EMAIL_REISSUE_REQUIRED`인지 확인한다. 이때 기존 작업·토큰은 supersede/revoke되어 다음 `/send`가 새 generation을 만들어야 한다.
+6. worker가 `processing`의 마지막 시도에서 중단된 상황을 만들고 5분 뒤 실행해 이메일과 Slack 작업이 `failed`로 종결되는지 확인한다. 시도 횟수가 남은 stale lock은 재claim되어야 한다.
 
 ## 만료와 Slack 확인
 
@@ -41,6 +43,7 @@
 2. 관리자 Slack 알림 작업과 메시지가 토큰당 한 번만 만들어지고, 고객 이메일이나 견적 본문이 Slack에 포함되지 않는지 확인한다.
 3. 승인·취소·폐기·교체·사용된 토큰은 알림 대상에서 제외되는지 확인한다.
 4. 만료 시 견적이 `expired`, 토큰이 폐기되고 기존 발송 generation이 supersede되는지 확인한다.
+5. 이미 `sent`인 작업의 `/send`와 `/retry` 멱등 응답에서 실제 `expiresAt`과 `expirationAlertStatus`가 반환되는지 확인한다.
 
 ## 로컬 자동 검증
 

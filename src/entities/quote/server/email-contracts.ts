@@ -1,3 +1,5 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import type { Database } from "@/shared/types/database.generated";
 
 export type QuoteEmailDeliveryRow = Database["public"]["Tables"]["quote_email_deliveries"]["Row"];
@@ -22,4 +24,26 @@ export function mapQuoteEmailJob(
     errorCode: row.error_code,
     expirationAlertStatus,
   };
+}
+
+export async function loadQuoteEmailJobResponse(
+  client: SupabaseClient<Database>,
+  row: Parameters<typeof mapQuoteEmailJob>[0],
+) {
+  if (row.status !== "sent") return mapQuoteEmailJob(row);
+
+  const [tokenResult, alertResult] = await Promise.all([
+    client.from("quote_approval_tokens").select("expires_at")
+      .eq("id", row.approval_token_id).maybeSingle(),
+    client.from("quote_expiration_alerts").select("status")
+      .eq("approval_token_id", row.approval_token_id).maybeSingle(),
+  ]);
+  if (tokenResult.error || alertResult.error) {
+    throw new Error("QUOTE_EMAIL_STATUS_READ_FAILED");
+  }
+  return mapQuoteEmailJob(
+    row,
+    tokenResult.data?.expires_at ?? null,
+    alertResult.data?.status ?? null,
+  );
 }

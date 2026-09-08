@@ -91,6 +91,38 @@ describe("관리자 견적 이메일 API", { concurrency: false }, () => {
       if (expected < 300) assert.equal((await response.json()).data.jobId, jobId);
     }
   });
+
+  test("/send의 sent 멱등 응답은 실제 만료 시각과 Slack 상태를 반환한다", async () => {
+    const expiresAt = "2026-09-14T03:00:00Z";
+    const fake = createTestClient([
+      ok({ ...version(), quotes: { id: quoteId, inquiry_id: inquiryId, status: "sent", latest_version_id: versionId } }),
+      ok({ customer_name: "고객", email: "qa@example.invalid" }),
+      ok([{ result: "existing", delivery: row("sent") }]),
+    ], { token: { expires_at: expiresAt }, alert: { status: "sent" } });
+    verifiedAdmin = { ok: true, supabase: fake.client };
+
+    const response = await sendRoute.POST(new NextRequest("http://localhost/send", { method: "POST" }), context(versionId));
+
+    assert.equal(response.status, 200);
+    const data = (await response.json()).data;
+    assert.equal(data.expiresAt, expiresAt);
+    assert.equal(data.expirationAlertStatus, "sent");
+  });
+
+  test("/retry의 sent 멱등 응답은 실제 만료 시각과 Slack 상태를 반환한다", async () => {
+    const expiresAt = "2026-09-14T03:00:00Z";
+    const fake = createTestClient([
+      ok([{ result: "existing", delivery: row("sent") }]),
+    ], { token: { expires_at: expiresAt }, alert: { status: "retry" } });
+    verifiedAdmin = { ok: true, supabase: fake.client };
+
+    const response = await retryRoute.POST(new NextRequest("http://localhost/retry", { method: "POST" }), context(jobId));
+
+    assert.equal(response.status, 200);
+    const data = (await response.json()).data;
+    assert.equal(data.expiresAt, expiresAt);
+    assert.equal(data.expirationAlertStatus, "retry");
+  });
 });
 
 function version() {
@@ -102,11 +134,17 @@ function row(status: Database["public"]["Enums"]["quote_delivery_status"]) {
 }
 
 type CapturedRequest = { url: string; body: string };
-function createTestClient(responses: Response[]) {
+function createTestClient(
+  responses: Response[],
+  related?: { token: { expires_at: string | null }; alert: { status: string } | null },
+) {
   let index = 0;
   const requests: CapturedRequest[] = [];
   const client = createClient<Database>("https://example.supabase.co", "test-key", { auth: { persistSession: false }, global: { fetch: async (input, init) => {
-    requests.push({ url: input instanceof Request ? input.url : String(input), body: typeof init?.body === "string" ? init.body : "" });
+    const url = input instanceof Request ? input.url : String(input);
+    requests.push({ url, body: typeof init?.body === "string" ? init.body : "" });
+    if (related && url.includes("/quote_approval_tokens?")) return ok(related.token);
+    if (related && url.includes("/quote_expiration_alerts?")) return ok(related.alert);
     return responses[index++] ?? ok({ code: "XX000" }, 500);
   } } });
   return { client, requests };

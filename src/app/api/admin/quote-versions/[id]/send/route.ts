@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { NextRequest } from "next/server";
 
 import { quoteVersionIdSchema } from "@/entities/quote";
-import { mapQuoteEmailJob } from "@/entities/quote/server/email-contracts";
+import { loadQuoteEmailJobResponse, mapQuoteEmailJob } from "@/entities/quote/server/email-contracts";
 import { createQuoteEmailPayload } from "@/entities/quote/server/email-payload";
 import { mapQuoteRpcError } from "@/entities/quote/server/rpc-errors";
 import { createApprovalToken } from "@/entities/quote/server/token";
@@ -61,5 +61,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   if (result.result === "retry_required") {
     return jsonError("QUOTE_EMAIL_RETRY_REQUIRED", "The failed email job must be retried", 409, mapQuoteEmailJob(result.delivery));
   }
-  return jsonOk(mapQuoteEmailJob(result.delivery), { status: result.result === "created" ? 202 : 200 });
+  const response = await loadQuoteEmailJobResponse(verified.supabase, result.delivery)
+    .catch(() => null);
+  if (!response) return jsonError("QUOTE_EMAIL_STATUS_READ_FAILED", "Failed to read quote email status", 500);
+  return jsonOk(response, { status: result.result === "created" ? 202 : 200 });
 }

@@ -28,7 +28,7 @@ Resend SDK 의존성은 추가하지 않고 공식 HTTP API를 얇은 공통 pro
 - `error_code text`: 개인정보나 provider 원문을 포함하지 않는 정제된 오류 코드
 - `sent_at`, `completed_at`, `superseded_at`, `created_at`, `updated_at`
 
-`quote_version_id + generation`은 유일하다. `superseded_at is null`인 작업은 버전당 하나만 허용하는 부분 unique 인덱스로 동시 `/send` 요청을 직렬화한다. `sent` 작업도 토큰이 유효한 동안 현재 generation으로 유지한다. 만료·폐기·사용된 토큰의 작업은 lifecycle RPC가 `superseded_at`을 기록하며 이후 `/send`가 같은 버전에 다음 generation을 만들 수 있다. 최종 `failed` 작업은 자동으로 supersede하지 않으므로 `/send`가 새 메일을 만들지 않고 수동 retry를 요구한다.
+`quote_version_id + generation`은 유일하다. `superseded_at is null`인 작업은 버전당 하나만 허용하는 부분 unique 인덱스로 동시 `/send` 요청을 직렬화한다. `sent` 작업도 토큰이 유효한 동안 현재 generation으로 유지한다. 만료·폐기·사용된 토큰의 작업은 lifecycle RPC가 `superseded_at`을 기록하며 이후 `/send`가 같은 버전에 다음 generation을 만들 수 있다. 최종 `failed` 작업은 최초 dispatch 뒤 24시간 이내에만 수동 retry할 수 있다. 이후에는 기존 작업과 토큰을 원자적으로 supersede/revoke하고 같은 버전에 다음 generation을 발급한다.
 
 암호화 payload에는 다음 고정 스냅샷을 넣는다.
 
@@ -78,8 +78,9 @@ AAD는 다음 값을 길이 구분이 있는 고정 JSON 배열로 직렬화한�
 4. 고정 메일 payload를 AES-256-GCM으로 암호화하고 토큰 SHA-256 해시를 만든다.
 5. `enqueue_quote_email_delivery` RPC에 ID, 해시, 암호문 구성 요소를 전달한다.
 6. RPC는 견적 행을 잠근 뒤 아래를 한 트랜잭션으로 수행한다.
-   - 현재 작업이 `queued|processing|retry|sent`이고 토큰이 유효하면 기존 작업을 반환한다.
-   - 현재 작업이 `failed`이고 토큰이 유효하면 `retry_required`를 반환한다.
+   - 현재 작업이 `queued|processing|retry|sent`이고 토큰이 유효하며 최초 dispatch 뒤 24시간 이내이면 기존 작업을 반환한다.
+   - 현재 작업이 `failed`이고 최초 dispatch 뒤 24시간 이내이면 `retry_required`를 반환한다.
+   - 24시간이 지난 미발송 작업은 작업·토큰을 supersede/revoke한 뒤 새 generation을 만든다.
    - 토큰이 만료·폐기·사용됐으면 기존 작업을 supersede하고 기존 토큰을 폐기한다.
    - `expires_at = null`인 새 토큰을 삽입하고 다음 generation의 `queued` 작업을 삽입한다.
    - enqueue 단계에서는 견적 상태를 변경하지 않는다.
@@ -105,19 +106,20 @@ Resend 성공 후 `finalize_quote_email_delivery` RPC가 한 트랜잭션에서 
 - 견적 `sent`
 - 토큰 `expires_at = sent_at + interval '7 days'`
 
-Resend 성공 뒤 finalize DB 호출만 실패하면 작업 lock이 만료된 후 같은 작업을 다시 claim한다. worker는 같은 암호화 payload와 같은 idempotency key로 Resend를 재호출해 기존 provider message ID를 회수한 뒤 finalize한다. 이 장애 경로를 테스트한다.
+Resend 성공 뒤 finalize DB 호출만 실패하면 작업 lock이 만료된 후 같은 작업을 다시 claim한다. worker는 최초 dispatch 뒤 24시간 이내에만 같은 암호화 payload와 idempotency key로 Resend를 재호출해 기존 provider message ID를 회수한 뒤 finalize한다. 24시간 경계에 도달하면 기존 링크를 폐기하고 새 generation 재발급을 요구한다. claim RPC도 오래된 queued/retry/processing 작업을 발송하지 않도록 같은 경계를 강제한다.
 
-provider 오류나 암호화 오류는 정제된 코드만 저장한다. 재시도 가능 오류는 `retry`와 다음 시각을 기록한다. 최대 시도에 도달하면 `failed`로 끝내되 견적은 `draft`로 유지한다.
+provider 오류나 암호화 오류는 정제된 코드만 저장한다. 재시도 가능 오류는 `retry`와 다음 시각을 기록한다. 최대 시도에 도달하면 `failed`로 끝내되 견적은 `draft`로 유지한다. worker가 마지막 claim 뒤 중단되어 `processing`에 남은 경우, 5분 lock timeout 후 claim RPC가 이메일과 Slack 작업을 각각 안전한 오류 코드의 `failed`로 종결한다. 시도 횟수가 남은 stale lock은 다시 claim한다.
 
 ## 수동 retry와 재발급
 
 ### `POST /api/admin/quote-email-jobs/[id]/retry`
 
-- `failed` 작업의 토큰이 아직 유효하고 폐기·사용되지 않았으면 같은 작업을 `queued`로 되돌리고 시도 횟수를 0으로 초기화한다. 응답은 `202`다.
+- `failed` 작업의 토큰이 아직 유효하고 폐기·사용되지 않았으며 최초 dispatch 뒤 24시간 이내이면 같은 작업을 `queued`로 되돌리고 시도 횟수를 0으로 초기화한다. 응답은 `202`다.
 - 이미 `queued|processing|retry`이면 상태를 변경하지 않고 `200`으로 같은 작업을 반환한다.
 - 이미 `sent`이면 `200`으로 같은 결과를 반환한다.
 - 토큰이 만료·폐기·사용됐거나 견적이 승인·취소됐으면 `409 QUOTE_EMAIL_REISSUE_REQUIRED` 또는 `409 QUOTE_EMAIL_UNAVAILABLE`을 반환한다.
-- retry는 작업 ID, 토큰, 암호문, idempotency key를 바꾸지 않는다.
+- 허용 창 안의 retry는 작업 ID, 토큰, 암호문, idempotency key를 바꾸지 않는다.
+- 최초 dispatch 뒤 24시간이 지난 failed 작업은 `409 QUOTE_EMAIL_REISSUE_REQUIRED`다. 같은 트랜잭션에서 기존 작업을 supersede하고 토큰을 폐기하므로 다음 `/send`가 새 generation을 만들 수 있다.
 
 만료·폐기된 토큰은 retry하지 않는다. 관리자는 동일한 `/send` API를 다시 호출해 같은 견적 버전에 새 토큰과 다음 generation 작업을 만든다. 견적 내용이 바뀔 때만 새 견적 버전을 만든다.
 
@@ -160,7 +162,7 @@ errorCode
 expirationAlertStatus
 ```
 
-암호화 컬럼, 잠금 정보, provider message ID, 수신자 정보는 API 응답에서 제외한다.
+암호화 컬럼, 잠금 정보, provider message ID, 수신자 정보는 API 응답에서 제외한다. `sent` 작업의 `/send`·`retry` 멱등 응답은 토큰과 만료 알림 테이블을 안전하게 후속 조회해 실제 `expiresAt`, `expirationAlertStatus`를 반환한다.
 
 ## 환경변수
 
@@ -177,7 +179,7 @@ expirationAlertStatus
 TDD로 아래 동작을 먼저 실패시키고 최소 구현으로 통과시킨다.
 
 - migration 정적 계약: 테이블, RLS, 부분 unique, claim/enqueue/finalize/retry/lifecycle RPC와 권한
-- 로컬 PostgreSQL 통합: 동시 enqueue 멱등성, generation 증가, 실패 retry, 만료 후 재발급, 성공 후에만 `sent`, 성공 시각 기준 7일 만료, 만료 처리, Slack 작업 1회 생성, 무효 토큰 제외
+- 로컬 PostgreSQL 통합: 동시 enqueue 멱등성, generation 증가, 24시간 retry 경계와 재발급, stale lock 재claim·최종 실패 복구, 성공 후에만 `sent`, 성공 시각 기준 7일 만료, 만료 처리, Slack 작업 1회 생성, 무효 토큰 제외
 - 암호화: 정상 round-trip, 랜덤 nonce, 잘못된 키·태그·AAD와 행 교체 탐지
 - 이메일 renderer: 고객명, 견적 요약, 만료일, 승인 링크가 HTML/text에 포함되고 안전하게 escape됨
 - Resend provider: 고정 idempotency header, 성공 ID 파싱, 오류 본문·주소·키 비노출

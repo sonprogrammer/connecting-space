@@ -127,16 +127,24 @@ begin
     select * into current_token from public.quote_approval_tokens where id = current_delivery.approval_token_id;
     if current_token.revoked_at is null and current_token.used_at is null
        and (current_token.expires_at is null or current_token.expires_at > p_now) then
-      if current_delivery.status = 'failed' then
+      if current_delivery.status <> 'sent'
+         and current_delivery.dispatch_started_at is not null
+         and current_delivery.dispatch_started_at <= p_now - interval '24 hours' then
+        update public.quote_email_deliveries set superseded_at = p_now where id = current_delivery.id;
+        update public.quote_approval_tokens set revoked_at = p_now
+          where id = current_delivery.approval_token_id and revoked_at is null and used_at is null;
+      elsif current_delivery.status = 'failed' then
         return query select 'retry_required'::text, current_delivery;
         return;
+      else
+        return query select 'existing'::text, current_delivery;
+        return;
       end if;
-      return query select 'existing'::text, current_delivery;
-      return;
+    else
+      update public.quote_email_deliveries set superseded_at = p_now where id = current_delivery.id;
+      update public.quote_approval_tokens set revoked_at = coalesce(revoked_at, p_now)
+        where id = current_delivery.approval_token_id and used_at is null;
     end if;
-    update public.quote_email_deliveries set superseded_at = p_now where id = current_delivery.id;
-    update public.quote_approval_tokens set revoked_at = coalesce(revoked_at, p_now)
-      where id = current_delivery.approval_token_id and used_at is null;
   end if;
 
   select coalesce(max(generation), 0) + 1 into next_generation
@@ -158,8 +166,23 @@ create or replace function public.claim_quote_email_deliveries(
   p_worker_id text, p_limit integer default 5, p_now timestamptz default now()
 )
 returns setof public.quote_email_deliveries
-language sql security definer set search_path = public as $$
-  with claimable as (
+language plpgsql security definer set search_path = public as $$
+begin
+  update public.quote_approval_tokens token set revoked_at = p_now
+  from public.quote_email_deliveries delivery
+  where delivery.approval_token_id = token.id
+    and delivery.superseded_at is null and delivery.status <> 'sent'
+    and delivery.dispatch_started_at is not null
+    and delivery.dispatch_started_at <= p_now - interval '24 hours'
+    and token.revoked_at is null and token.used_at is null;
+
+  update public.quote_email_deliveries set
+    status = 'failed', locked_at = null, locked_by = null,
+    error_code = 'QUOTE_EMAIL_WORKER_LOCK_EXPIRED'
+  where status = 'processing' and attempt_count >= max_attempts
+    and locked_at < p_now - interval '5 minutes';
+
+  return query with claimable as (
     select delivery.id from public.quote_email_deliveries delivery
     join public.quote_approval_tokens token on token.id = delivery.approval_token_id
     join public.quotes quote on quote.id = delivery.quote_id
@@ -179,6 +202,7 @@ language sql security definer set search_path = public as $$
     locked_at = p_now, locked_by = p_worker_id, error_code = null,
     dispatch_started_at = coalesce(delivery.dispatch_started_at, p_now)
   from claimable where delivery.id = claimable.id returning delivery.*;
+end;
 $$;
 
 create or replace function public.finalize_quote_email_delivery(
@@ -238,6 +262,16 @@ begin
   if quote_row.status in ('approved', 'cancelled') or quote_row.latest_version_id <> job.quote_version_id then
     return query select 'unavailable'::text, job; return;
   end if;
+  if job.dispatch_started_at is not null
+     and job.dispatch_started_at <= p_now - interval '24 hours' then
+    update public.quote_email_deliveries set superseded_at = p_now,
+      locked_at = null, locked_by = null, error_code = 'QUOTE_EMAIL_REISSUE_REQUIRED'
+      where id = p_job_id returning * into job;
+    update public.quote_approval_tokens set revoked_at = p_now
+      where id = job.approval_token_id and revoked_at is null and used_at is null;
+    return query select 'reissue_required'::text, job;
+    return;
+  end if;
   update public.quote_email_deliveries set status = 'queued', attempt_count = 0,
     available_at = p_now, locked_at = null, locked_by = null, error_code = null
     where id = p_job_id returning * into job;
@@ -284,7 +318,14 @@ create or replace function public.claim_quote_expiration_alerts(
 )
 returns setof public.quote_expiration_alerts
 language sql security definer set search_path = public as $$
-  with claimable as (
+  with exhausted as (
+    update public.quote_expiration_alerts set
+      status = 'failed', locked_at = null, locked_by = null,
+      error_code = 'QUOTE_EXPIRATION_WORKER_LOCK_EXPIRED'
+    where status = 'processing' and attempt_count >= max_attempts
+      and locked_at < p_now - interval '5 minutes'
+    returning id
+  ), claimable as (
     select alert.id from public.quote_expiration_alerts alert
     join public.quote_approval_tokens token on token.id = alert.approval_token_id
     join public.quotes quote on quote.id = alert.quote_id
@@ -292,6 +333,7 @@ language sql security definer set search_path = public as $$
       and token.expires_at > p_now and token.revoked_at is null and token.used_at is null
       and ((alert.status in ('queued', 'retry') and alert.available_at <= p_now)
         or (alert.status = 'processing' and alert.locked_at < p_now - interval '5 minutes'))
+      and (select count(*) from exhausted) >= 0
     order by alert.available_at, alert.created_at
     for update of alert skip locked limit greatest(1, least(coalesce(p_limit, 5), 20))
   )

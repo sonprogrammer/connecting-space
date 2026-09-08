@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { NextRequest } from "next/server";
 
-import { mapQuoteEmailJob } from "@/entities/quote/server/email-contracts";
+import { loadQuoteEmailJobResponse } from "@/entities/quote/server/email-contracts";
 import { jsonError, jsonOk } from "@/shared/api/response";
 import { getVerifiedAdminSupabase } from "@/shared/lib/auth/admin-api";
 
@@ -16,5 +16,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   if (result.result === "not_found") return jsonError("QUOTE_EMAIL_JOB_NOT_FOUND", "Quote email job not found", 404);
   if (result.result === "reissue_required") return jsonError("QUOTE_EMAIL_REISSUE_REQUIRED", "A new approval link must be issued", 409);
   if (result.result === "unavailable") return jsonError("QUOTE_EMAIL_UNAVAILABLE", "Quote email is unavailable", 409);
-  return jsonOk(mapQuoteEmailJob(result.delivery), { status: result.result === "requeued" ? 202 : 200 });
+  const response = await loadQuoteEmailJobResponse(verified.supabase, result.delivery)
+    .catch(() => null);
+  if (!response) return jsonError("QUOTE_EMAIL_STATUS_READ_FAILED", "Failed to read quote email status", 500);
+  return jsonOk(response, { status: result.result === "requeued" ? 202 : 200 });
 }
