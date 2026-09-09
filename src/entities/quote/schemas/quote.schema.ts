@@ -14,6 +14,13 @@ const optionalDateSchema = z
 export const quoteIdSchema = z.uuid();
 export const quoteVersionIdSchema = z.uuid();
 
+export const manualQuoteDeliverySchema = z
+  .object({
+    idempotencyKey: z.uuid(),
+    reissue: z.boolean().optional().default(false),
+  })
+  .strict();
+
 export const quoteSnapshotSchema = z
   .object({
     title: z.string().trim().min(1).max(200),
@@ -59,3 +66,4 @@ export const createQuoteSchema = z.object({
 
 export type QuoteSnapshotInput = z.infer<typeof quoteSnapshotSchema>;
 export type CreateQuoteInput = z.infer<typeof createQuoteSchema>;
+export type ManualQuoteDeliveryInput = z.infer<typeof manualQuoteDeliverySchema>;

@@ -198,6 +198,7 @@ export type Database = {
           status: Database["public"]["Enums"]["quote_status"];
           latest_version_id: string | null;
           approved_version_id: string | null;
+          delivery_method: Database["public"]["Enums"]["quote_delivery_method"] | null;
           created_by: string;
           created_at: string;
           updated_at: string;
@@ -208,6 +209,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["quote_status"];
           latest_version_id?: string | null;
           approved_version_id?: string | null;
+          delivery_method?: Database["public"]["Enums"]["quote_delivery_method"] | null;
           created_by: string;
           created_at?: string;
           updated_at?: string;
@@ -321,6 +323,36 @@ export type Database = {
           completed_at?: string | null; superseded_at?: string | null; created_at?: string; updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["quote_email_deliveries"]["Insert"]>;
+        Relationships: [];
+      };
+      quote_manual_deliveries: {
+        Row: {
+          id: string;
+          quote_id: string;
+          quote_version_id: string;
+          approval_token_id: string;
+          generation: number;
+          idempotency_key_hash: string;
+          issued_at: string;
+          expires_at: string;
+          superseded_at: string | null;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id: string;
+          quote_id: string;
+          quote_version_id: string;
+          approval_token_id: string;
+          generation: number;
+          idempotency_key_hash: string;
+          issued_at: string;
+          expires_at: string;
+          superseded_at?: string | null;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["quote_manual_deliveries"]["Insert"]>;
         Relationships: [];
       };
       quote_expiration_alerts: {
@@ -641,6 +673,21 @@ export type Database = {
         };
         Returns: Array<{ result: string; delivery: Database["public"]["Tables"]["quote_email_deliveries"]["Row"] }>;
       };
+      issue_quote_manual_delivery: {
+        Args: {
+          p_delivery_id: string;
+          p_quote_version_id: string;
+          p_token_id: string;
+          p_token_hash: string;
+          p_idempotency_key_hash: string;
+          p_reissue?: boolean;
+          p_issued_at?: string;
+        };
+        Returns: Array<{
+          result: string;
+          delivery: Database["public"]["Tables"]["quote_manual_deliveries"]["Row"];
+        }>;
+      };
       claim_quote_email_deliveries: {
         Args: { p_worker_id: string; p_limit?: number; p_now?: string };
         Returns: Database["public"]["Tables"]["quote_email_deliveries"]["Row"][];
@@ -687,6 +734,7 @@ export type Database = {
       payment_status: "expected" | "paid" | "overdue" | "cancelled";
       quote_status: "draft" | "sent" | "approved" | "expired" | "cancelled";
       quote_delivery_status: "queued" | "processing" | "retry" | "sent" | "failed";
+      quote_delivery_method: "email" | "manual";
       ai_generation_kind:
         | "inquiry_reply"
         | "proposal"

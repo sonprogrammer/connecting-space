@@ -4,6 +4,7 @@ import { describe, test } from "node:test";
 import { adminCreateInquirySchema } from "../src/entities/inquiry/schemas/admin-inquiry.schema";
 import {
   createQuoteSchema,
+  manualQuoteDeliverySchema,
   quoteSnapshotSchema,
 } from "../src/entities/quote/schemas/quote.schema";
 
@@ -86,5 +87,33 @@ describe("관리자 직접 문의 스키마", () => {
 
     assert.equal(parsed.source, "admin_manual");
     assert.equal(parsed.adminNotes, "오후에 다시 연락");
+  });
+});
+
+describe("수동 견적 발급 요청 스키마", () => {
+  test("UUID 멱등 키와 명시적 재발급 여부만 허용한다", () => {
+    assert.deepEqual(
+      manualQuoteDeliverySchema.parse({
+        idempotencyKey: "44444444-4444-4444-8444-444444444444",
+      }),
+      {
+        idempotencyKey: "44444444-4444-4444-8444-444444444444",
+        reissue: false,
+      },
+    );
+    assert.equal(
+      manualQuoteDeliverySchema.safeParse({
+        idempotencyKey: "invalid",
+        reissue: true,
+      }).success,
+      false,
+    );
+    assert.equal(
+      manualQuoteDeliverySchema.safeParse({
+        idempotencyKey: "44444444-4444-4444-8444-444444444444",
+        token: "must-not-be-accepted",
+      }).success,
+      false,
+    );
   });
 });

@@ -152,7 +152,19 @@ describe("관리자 문의·견적 API", () => {
       error_code: null, superseded_at: null, created_at: "2026-09-06T00:00:00Z",
     };
     const alert = { approval_token_id: tokenId, status: "queued" };
-    const fake = createTestClient([ok(quote), ok([version]), ok([token]), ok([]), ok([delivery]), ok([alert])]);
+    const manualDelivery = {
+      id: "66666666-6666-4666-8666-666666666666",
+      quote_id: quoteId,
+      quote_version_id: versionId,
+      approval_token_id: tokenId,
+      generation: 1,
+      issued_at: "2026-09-06T00:00:00Z",
+      expires_at: "2026-09-13T00:00:00Z",
+      superseded_at: null,
+      created_by: inquiryId,
+      created_at: "2026-09-06T00:00:00Z",
+    };
+    const fake = createTestClient([ok(quote), ok([version]), ok([token]), ok([]), ok([delivery]), ok([manualDelivery]), ok([alert])]);
     verifiedAdmin = { ok: true, supabase: fake.client };
 
     const response = await quoteDetailRoute.GET(
@@ -163,6 +175,7 @@ describe("관리자 문의·견적 API", () => {
     const data = (await response.json()).data;
     assert.deepEqual(data.tokens, [token]);
     assert.deepEqual(data.emailDeliveries, [delivery]);
+    assert.deepEqual(data.manualDeliveries, [manualDelivery]);
     assert.deepEqual(data.expirationAlerts, [alert]);
     const tokenRequest = fake.requests.find((request) =>
       new URL(request.url).pathname.endsWith("/quote_approval_tokens"),
@@ -172,6 +185,9 @@ describe("관리자 문의·견적 API", () => {
     const deliveryRequest = fake.requests.find((request) => new URL(request.url).pathname.endsWith("/quote_email_deliveries"));
     assert.ok(deliveryRequest);
     assert.doesNotMatch(new URL(deliveryRequest.url).searchParams.get("select") ?? "", /encrypted_payload|payload_nonce|payload_auth_tag|provider_message_id|locked_/);
+    const manualDeliveryRequest = fake.requests.find((request) => new URL(request.url).pathname.endsWith("/quote_manual_deliveries"));
+    assert.ok(manualDeliveryRequest);
+    assert.doesNotMatch(new URL(manualDeliveryRequest.url).searchParams.get("select") ?? "", /idempotency_key_hash/);
   });
 });
 
