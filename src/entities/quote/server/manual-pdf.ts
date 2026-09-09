@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 
 import fontkit from "@pdf-lib/fontkit";
 import {
@@ -17,8 +18,15 @@ const MARGIN = 52;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const BODY_SIZE = 10.5;
 const BODY_LINE_HEIGHT = 17;
-const FONT_PATH = require.resolve(
-  "@fontsource/noto-sans-kr/files/noto-sans-kr-korean-400-normal.woff2",
+// Resolve this at runtime instead of importing the binary so webpack/Turbopack
+// does not try to parse the WOFF2 file as a JavaScript module.
+const FONT_PATH = path.join(
+  process.cwd(),
+  "node_modules",
+  "@fontsource",
+  "noto-sans-kr",
+  "files",
+  "noto-sans-kr-korean-400-normal.woff2",
 );
 
 export type ManualQuotePdfPayload = {
