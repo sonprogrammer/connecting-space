@@ -38,7 +38,7 @@
 ## Task 5: 문서·전체 검증·PR
 
 - [x] `.env.example`과 `docs/qa/issue-67-quote-manual-delivery.md`에 설정과 QA 절차를 한글로 작성한다.
-- [ ] 원격 DB 명령 없이 로컬 migration reset과 전체 통합 테스트를 실행한다.
-- [ ] `npm run lint`, `npm run type-check`, `npm test`, `npm run build`, `git diff --check`를 새로 실행한다.
-- [ ] 요구사항별 diff 자체 검토 후 커밋·push한다.
-- [ ] main 대상 별도 PR을 만들고 QA 방법, 검증 결과, 원격 DB 미적용 사실을 한글로 작성한다.
+- [x] 원격 DB 명령 없이 로컬 migration reset과 전체 통합 테스트를 실행한다.
+- [x] `npm run lint`, `npm run type-check`, `npm test`, `npm run build`, `git diff --check`를 새로 실행한다.
+- [x] 요구사항별 diff 자체 검토 후 커밋·push한다.
+- [x] main 대상 별도 PR을 만들고 QA 방법, 검증 결과, 원격 DB 미적용 사실을 한글로 작성한다.
