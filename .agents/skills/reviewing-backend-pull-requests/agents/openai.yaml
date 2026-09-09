@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reviewing Backend Pull Requests"
+  short_description: "Independently QA backend PRs before planner merge decisions"
+  default_prompt: "Use $reviewing-backend-pull-requests to independently verify this backend PR."

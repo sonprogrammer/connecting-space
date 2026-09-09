@@ -1,0 +1,4 @@
+interface:
+  display_name: "Reviewing Frontend Pull Requests"
+  short_description: "Independently QA frontend PRs before planner merge decisions"
+  default_prompt: "Use $reviewing-frontend-pull-requests to independently verify this frontend PR."
