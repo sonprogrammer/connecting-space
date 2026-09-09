@@ -5,6 +5,7 @@ export type QuoteVersionRow = Database["public"]["Tables"]["quote_versions"]["Ro
 export type QuoteApprovalTokenRow = Database["public"]["Tables"]["quote_approval_tokens"]["Row"];
 export type QuoteApprovalRow = Database["public"]["Tables"]["quote_approvals"]["Row"];
 export type QuoteEmailDeliveryRow = Database["public"]["Tables"]["quote_email_deliveries"]["Row"];
+export type QuoteManualDeliveryRow = Database["public"]["Tables"]["quote_manual_deliveries"]["Row"];
 export type QuoteExpirationAlertRow = Database["public"]["Tables"]["quote_expiration_alerts"]["Row"];
 
 export type CreatedQuote = {
@@ -23,6 +24,7 @@ export type AdminQuoteDetail = {
     "id" | "quote_id" | "quote_version_id" | "approval_token_id" | "generation" | "status"
     | "attempt_count" | "max_attempts" | "available_at" | "sent_at" | "error_code"
     | "superseded_at" | "created_at">>;
+  manualDeliveries: Array<Omit<QuoteManualDeliveryRow, "idempotency_key_hash">>;
   expirationAlerts: Array<Pick<QuoteExpirationAlertRow, "approval_token_id" | "status">>;
 };
 

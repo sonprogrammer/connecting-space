@@ -68,6 +68,13 @@ export async function GET(request: NextRequest, context: Context) {
     : { data: [], error: null };
   if (deliveriesResult.error) return jsonError("ADMIN_QUOTE_READ_FAILED", "Failed to read quote", 500);
 
+  const manualDeliveriesResult = versionIds.length
+    ? await verified.supabase.from("quote_manual_deliveries")
+        .select("id,quote_id,quote_version_id,approval_token_id,generation,issued_at,expires_at,superseded_at,created_by,created_at")
+        .in("quote_version_id", versionIds).order("created_at", { ascending: false })
+    : { data: [], error: null };
+  if (manualDeliveriesResult.error) return jsonError("ADMIN_QUOTE_READ_FAILED", "Failed to read quote", 500);
+
   const tokenIds = (tokensResult.data ?? []).map((token) => token.id);
   const alertsResult = tokenIds.length
     ? await verified.supabase.from("quote_expiration_alerts")
@@ -81,6 +88,7 @@ export async function GET(request: NextRequest, context: Context) {
     tokens: tokensResult.data ?? [],
     approvals: approvalsResult.data ?? [],
     emailDeliveries: deliveriesResult.data ?? [],
+    manualDeliveries: manualDeliveriesResult.data ?? [],
     expirationAlerts: alertsResult.data ?? [],
   });
 }
