@@ -21,12 +21,14 @@ npm run type-check
 npm run build -- --webpack
 ```
 
-승인된 테스트 fixture의 `QUOTE_CONTRACT_TEST_VERSION_ID`와 관리자 access token을 설정한 뒤:
+통합 테스트가 `supabase status -o env`에서 로컬 키를 읽고 테스트용 관리자·문의·견적 fixture를 생성·정리하므로 별도 ID나 access token 설정이 필요 없다:
 
 ```bash
 RUN_QUOTE_CONTRACT_INTEGRATION_TESTS=1 \
 npm test -- --test-name-pattern='서명 확인 전환'
 ```
+
+위 명령은 `supabase db reset` 직후 실행하며, fixture와 인증 사용자는 테스트 종료 시 정리한다.
 
 확인할 항목:
 
