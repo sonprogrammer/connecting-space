@@ -82,6 +82,8 @@ If targeted evidence conflicts with QA, do not merge. Record the evidence and re
 
 Before merge, confirm authorization in the current conversation. `확인해줘` or `진행해줘` after the user says QA is complete grants merge authority only when the gate passes. It does not authorize deployment or remote data changes.
 
+For `DO NOT MERGE` or `BLOCKED`, the Planner owns the handoff. Post one actionable top-level PR comment before reporting the decision. Include the current full HEAD, failure evidence, responsible role, exact fix or unblock task, required verification, and a request for QA on the new HEAD. State any merge, deployment, or remote-DB prohibition that applies. Then tell 손 대표님 that the comment was posted; do not ask 손 대표님 to copy and relay it. If an existing Planner handoff covers the same HEAD, update or supersede it clearly instead of adding contradictory instructions. Never include secrets. An explicit user instruction not to comment in the current case overrides this step.
+
 Default to squash merge. After the command succeeds:
 
 1. Re-read PR state and merge commit.
@@ -130,13 +132,13 @@ Examples of owner-only checks include signed-in admin behavior, real Resend/Slac
 - 플래너 표적 검증: `<없음 또는 근거와 결과>`
 
 ### 처리
-- `<merge commit 또는 수정/재검증 요청>`
+- `<merge commit 또는 PR에 직접 남긴 수정/재검증 코멘트>`
 
 ### 손 대표님이 할 일
 - `<없음 또는 위치 → 행동 → 정상 기준>`
 
 ### 다음 작업
-- `<역할 + 이슈 번호 + 복사 가능한 한 명령>`
+- `<역할 + 이슈 번호 + 이미 전달된 한 가지 다음 작업>`
 ```
 
 ## Common mistakes
@@ -150,3 +152,4 @@ Examples of owner-only checks include signed-in admin behavior, real Resend/Slac
 | Combining API, UI, deployment, and live checks into one owner | Split by role and dependency |
 | Saying “all done” after merge | Confirm issue, migrations, configuration, deployment, and manual checks |
 | Giving several next tasks at once | Choose the single next dependency-unlocking action |
+| Making 손 대표님 relay a fix command | Post the actionable handoff directly on the PR |

@@ -30,12 +30,15 @@ checks = {
     and "Do not convert Planner work into a second full QA pass" in reference,
     "planner is not qa": "Do not implement feature code or impersonate QA" in skill
     and "while QA owns independent validation" in pressure,
-    "merge authorization bounded": "Merge authorization does not authorize deployment" in skill
+    "merge authorization bounded": "Merge authorization excludes deployment" in skill
     and "grants merge authority only" in reference,
     "issue closure checked": "linked issue closed" in skill
     and "If auto-close syntax was missing" in reference,
     "single next action": "one next action" in skill
     and "Assign exactly one next" in reference,
+    "planner posts failed handoff": "comment the actionable handoff on the PR" in skill
+    and "do not ask 손 대표님 to copy and relay it" in reference
+    and "explicitly says not to post it for the current case" in skill,
     "pressure baseline recorded": pressure.count("Actual response:") >= 3
     and "RED failure pattern" in pressure,
     "green pressure tests passed": pressure.count("GREEN result: PASS") == 3
