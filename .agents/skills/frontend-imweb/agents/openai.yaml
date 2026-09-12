@@ -1,0 +1,4 @@
+interface:
+  display_name: "frontend-imweb"
+  short_description: "Safely implement imweb frontend UI work"
+  default_prompt: "Use $frontend-imweb for frontend work in the imweb repository."
