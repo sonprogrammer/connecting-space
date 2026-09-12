@@ -1,4 +1,4 @@
 interface:
-  display_name: "Implementing imweb Backend"
+  display_name: "backend-imweb"
   short_description: "Safely implement imweb backend API and Supabase work"
   default_prompt: "Use $backend-imweb for backend work in the imweb repository."
