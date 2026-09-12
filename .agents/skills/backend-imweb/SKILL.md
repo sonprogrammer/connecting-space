@@ -1,5 +1,5 @@
 ---
-name: implementing-imweb-backend
+name: backend-imweb
 description: Use when implementing API, Supabase, authentication, migration, worker, queue, or external-provider backend work in the connecting-space imweb repository.
 ---
 

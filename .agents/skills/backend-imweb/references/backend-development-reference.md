@@ -29,10 +29,10 @@
 
 ### RED — 스킬 미적용 baseline
 
-스킬 파일이 없는 상태에서 계약 검사 실행:
+`backend-imweb` 스킬 파일이 없는 상태에서 계약 검사 실행:
 
 ```text
-AssertionError: RED: implementing-imweb-backend skill is not installed
+AssertionError: RED: backend-imweb skill is not installed
 ```
 
 이는 설치 전에는 백엔드 전용 경계와 안전 규칙을 검사할 문서가 없음을 입증한다.

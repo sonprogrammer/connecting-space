@@ -7,7 +7,7 @@ skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
 reference = (ROOT / "references" / "backend-development-reference.md").read_text(encoding="utf-8")
 
 checks = {
-    "frontmatter and identity": skill.startswith("---\nname: implementing-imweb-backend\n"),
+    "frontmatter and identity": skill.startswith("---\nname: backend-imweb\n"),
     "frontend boundary": "Frontend UI는 구현하지 않는다" in skill,
     "remote migration boundary": "supabase db push --linked" in skill and "원격 SQL" in skill,
     "tdd cycle": all(term in skill for term in ("RED", "GREEN", "REFACTOR")),
