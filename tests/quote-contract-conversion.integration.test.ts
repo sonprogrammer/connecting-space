@@ -55,7 +55,7 @@ describe("로컬 서명 확인 전환 PostgreSQL 통합", { skip: !enabled }, ()
       assert.ok(confirmation?.project_id && confirmation.deposit_payment_id && confirmation.balance_payment_id);
       const payments = await service.from("payments").select("kind,amount,due_date").eq("project_id", confirmation.project_id).order("kind");
       assert.equal(payments.error, null);
-      assert.deepEqual(payments.data?.map((row) => [row.kind, row.amount, row.due_date]), [["balance", 71, "2026-10-01"], ["deposit", 30, "2026-09-12"]]);
+      assert.deepEqual(payments.data?.map((row) => [row.kind, row.amount, row.due_date]), [["deposit", 30, "2026-09-12"], ["balance", 71, "2026-10-01"]]);
 
       const retry = await client.rpc("confirm_quote_contract", { ...base, p_confirmation_id: randomUUID(), p_idempotency_key_hash: "2".repeat(64) });
       assert.equal(retry.error, null, retry.error?.message);
@@ -73,7 +73,7 @@ describe("로컬 서명 확인 전환 PostgreSQL 통합", { skip: !enabled }, ()
       const overrideProjectId = override.data?.[0]?.confirmation?.project_id;
       assert.ok(overrideProjectId);
       const overridePayments = await service.from("payments").select("kind,amount,due_date").eq("project_id", overrideProjectId).order("kind");
-      assert.deepEqual(overridePayments.data?.map((row) => [row.kind, row.amount, row.due_date]), [["balance", 75, "2026-10-20"], ["deposit", 25, "2026-09-20"]]);
+      assert.deepEqual(overridePayments.data?.map((row) => [row.kind, row.amount, row.due_date]), [["deposit", 25, "2026-09-20"], ["balance", 75, "2026-10-20"]]);
       const failed = await client.rpc("confirm_quote_contract", { ...base, p_quote_version_id: rollback.versionId, p_confirmation_id: randomUUID(), p_idempotency_key_hash: "6".repeat(64) });
       assert.equal(failed.error?.code, "P0001");
       assert.equal((await service.from("quote_contract_confirmations").select("id").eq("quote_version_id", rollback.versionId)).data?.length, 0);
