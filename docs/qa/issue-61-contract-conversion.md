@@ -25,7 +25,7 @@ npm run build -- --webpack
 
 ```bash
 RUN_QUOTE_CONTRACT_INTEGRATION_TESTS=1 \
-npm test -- --test-name-pattern='서명 확인 전환'
+npm test
 ```
 
 위 명령은 `supabase db reset` 직후 실행하며, fixture와 인증 사용자는 테스트 종료 시 정리한다.
