@@ -6,7 +6,7 @@
 
 ## 권장 스킬 식별자
 
-- 이름: `managing-imweb-delivery`
+- 이름: `planner-imweb`
 - 트리거 설명 예시: `Use when planning, coordinating, or making merge decisions for work in the connecting-space imweb repository.`
 - 적용 대상: 기능 설계, GitHub 이슈·PR 조율, QA 판정 검토, 머지 결정, migration·환경변수·수동 확인 인계
 - 제외 대상: 기능 코드 직접 구현, 프론트·백엔드 QA 전체 재실행, 운영 배포를 직접 수행하는 작업

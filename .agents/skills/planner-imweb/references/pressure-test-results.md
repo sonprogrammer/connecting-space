@@ -1,7 +1,7 @@
 # Planner Skill Validation Record
 
 Validation date: 2026-09-12
-Target: `managing-imweb-delivery`
+Target: `planner-imweb`
 
 The RED responses below were produced by three independent agents that were explicitly told not to inspect or use project skills. They were given time, urgency, authority, and scope pressures. Quotations preserve the decisive response text.
 

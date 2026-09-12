@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate mechanical invariants of the managing-imweb-delivery skill."""
+"""Validate mechanical invariants of the planner-imweb skill."""
 from pathlib import Path
 import re
 
@@ -15,7 +15,7 @@ pressure = PRESSURE_PATH.read_text(encoding="utf-8")
 frontmatter = re.match(r"\A---\n(.*?)\n---\n", skill, re.DOTALL)
 checks = {
     "valid frontmatter": bool(frontmatter)
-    and "name: managing-imweb-delivery" in frontmatter.group(1)
+    and "name: planner-imweb" in frontmatter.group(1)
     and "description: Use when" in frontmatter.group(1),
     "reference links resolve": "(references/planner-workflow-reference.md)" in skill
     and REFERENCE_PATH.is_file()

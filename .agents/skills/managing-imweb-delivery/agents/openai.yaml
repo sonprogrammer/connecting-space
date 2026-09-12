@@ -1,4 +1,0 @@
-interface:
-  display_name: "Managing Imweb Delivery"
-  short_description: "Plan work and make evidence-based PR merge decisions"
-  default_prompt: "Use $managing-imweb-delivery to plan this work or decide whether the current PR is ready to merge."
