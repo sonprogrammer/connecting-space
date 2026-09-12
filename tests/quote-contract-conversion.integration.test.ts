@@ -114,10 +114,13 @@ async function createFixture(service: LocalClient, adminId: string, options: { t
   const versionId = randomUUID();
   const tokenId = randomUUID();
   const now = new Date().toISOString();
-  assert.equal((await service.from("inquiries").insert({ id: inquiryId, customer_name: "Issue 61 Test", email: `fixture-${inquiryId}@local.test`, service_type: "web", message: "fixture" })).error, null);
-  assert.equal((await service.from("quotes").insert({ id: quoteId, inquiry_id: inquiryId, status: options.status, created_by: adminId, approved_version_id: options.status === "approved" ? versionId : null })).error, null);
-  assert.equal((await service.from("quote_versions").insert({ id: versionId, quote_id: quoteId, version_number: 1, title: "Issue 61 fixture", body: "fixture body", scope_items: ["fixture"], total_amount: options.total, estimated_start_date: "2026-09-12", estimated_end_date: "2026-10-01", deposit_amount: Math.floor(options.total * .3), balance_amount: options.total - Math.floor(options.total * .3), deposit_terms: "30%", balance_terms: "70%", created_by: adminId })).error, null);
-  assert.equal((await service.from("quotes").update({ latest_version_id: versionId }).eq("id", quoteId)).error, null);
+  try {
+    // quote_versions가 아직 없으므로 먼저 approved_version_id 없이 quote를 만든다.
+    assert.equal((await service.from("inquiries").insert({ id: inquiryId, customer_name: "Issue 61 Test", email: `fixture-${inquiryId}@local.test`, service_type: "web", message: "fixture" })).error, null);
+    assert.equal((await service.from("quotes").insert({ id: quoteId, inquiry_id: inquiryId, status: options.status, created_by: adminId })).error, null);
+    assert.equal((await service.from("quote_versions").insert({ id: versionId, quote_id: quoteId, version_number: 1, title: "Issue 61 fixture", body: "fixture body", scope_items: ["fixture"], total_amount: options.total, estimated_start_date: "2026-09-12", estimated_end_date: "2026-10-01", deposit_amount: Math.floor(options.total * .3), balance_amount: options.total - Math.floor(options.total * .3), deposit_terms: "30%", balance_terms: "70%", created_by: adminId })).error, null);
+    const quoteUpdate = { latest_version_id: versionId, ...(options.status === "approved" ? { approved_version_id: versionId } : {}) };
+    assert.equal((await service.from("quotes").update(quoteUpdate).eq("id", quoteId)).error, null);
   if (options.status === "approved") {
     assert.equal((await service.from("quote_approval_tokens").insert({ id: tokenId, quote_version_id: versionId, token_hash: `${tokenId.replaceAll("-", "")}0000000000000000000000000000000000000000000000000000`.slice(0, 64), expires_at: new Date(Date.now() + 86400000).toISOString(), created_by: adminId })).error, null);
     assert.equal((await service.from("quote_approvals").insert({ quote_id: quoteId, quote_version_id: versionId, approval_token_id: tokenId })).error, null);
@@ -135,7 +138,12 @@ async function createFixture(service: LocalClient, adminId: string, options: { t
     assert.equal(project.error, null);
     assert.equal((await service.from("payments").insert({ project_id: project.data.id, kind: "deposit", amount: 1, due_date: "2026-09-12" })).error, null);
   }
-  return { inquiryId, versionId };
+    return { inquiryId, versionId };
+  } catch (error) {
+    // 단계 중간 실패에도 이미 생성된 inquiry/quote/version 및 부속 row를 정리한다.
+    await cleanupFixture(service, inquiryId);
+    throw error;
+  }
 }
 
 async function cleanupFixture(service: LocalClient, inquiryId: string) {
