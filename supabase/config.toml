@@ -1,0 +1,16 @@
+project_id = "imweb-issue61-local"
+
+[api]
+port = 56341
+
+[db]
+port = 56342
+
+[studio]
+port = 56343
+
+[inbucket]
+port = 56344
+
+[analytics]
+enabled = false

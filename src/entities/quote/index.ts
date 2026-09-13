@@ -8,6 +8,8 @@ export type {
   QuoteManualDeliveryRow,
   QuoteVersionRow,
 } from "./api/contracts";
+export type { ConfirmQuoteContractInput, ConfirmQuoteContractResponse } from "./api/contract-conversion";
+export { confirmQuoteContractSchema } from "./api/contract-conversion";
 export {
   createQuoteSchema,
   manualQuoteDeliverySchema,

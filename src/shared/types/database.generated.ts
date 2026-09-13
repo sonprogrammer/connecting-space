@@ -355,6 +355,36 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["quote_manual_deliveries"]["Insert"]>;
         Relationships: [];
       };
+      quote_contract_confirmations: {
+        Row: {
+          id: string;
+          quote_id: string;
+          quote_version_id: string;
+          idempotency_key_hash: string;
+          confirmed_at: string;
+          confirmed_by: string;
+          customer_id: string;
+          project_id: string;
+          deposit_payment_id: string;
+          balance_payment_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          quote_id: string;
+          quote_version_id: string;
+          idempotency_key_hash: string;
+          confirmed_at: string;
+          confirmed_by: string;
+          customer_id: string;
+          project_id: string;
+          deposit_payment_id: string;
+          balance_payment_id: string;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["quote_contract_confirmations"]["Insert"]>;
+        Relationships: [];
+      };
       quote_expiration_alerts: {
         Row: {
           id: string; quote_id: string; quote_version_id: string; approval_token_id: string;
@@ -686,6 +716,28 @@ export type Database = {
         Returns: Array<{
           result: string;
           delivery: Database["public"]["Tables"]["quote_manual_deliveries"]["Row"];
+        }>;
+      };
+      confirm_quote_contract: {
+        Args: {
+          p_confirmation_id: string;
+          p_quote_version_id: string;
+          p_idempotency_key_hash: string;
+          p_confirmed_at: string;
+          p_customer_name?: string | null;
+          p_customer_memo?: string | null;
+          p_project_name?: string | null;
+          p_project_memo?: string | null;
+          p_deposit_percentage?: number;
+          p_balance_percentage?: number;
+          p_deposit_amount?: number | null;
+          p_balance_amount?: number | null;
+          p_deposit_due_date?: string | null;
+          p_balance_due_date?: string | null;
+        };
+        Returns: Array<{
+          result: string;
+          confirmation: Database["public"]["Tables"]["quote_contract_confirmations"]["Row"];
         }>;
       };
       claim_quote_email_deliveries: {
