@@ -40,11 +40,13 @@ npm run build -- --webpack
 git diff --check <base>...HEAD
 ```
 
-PR에는 `Closes #<issue>`, 사용자 흐름·제외 범위, 사용 endpoint/오류 계약, 캐시·mutation·접근성·반응형 동작, 명령과 수치, Browser 확인/미확인 항목, 새 환경변수와 수동 확인을 적는다. QA 독립 판정을 대신 작성하지 않는다.
+PR 본문과 GitHub 코멘트는 실제 Markdown으로 작성하며, 최상단에 `## [프론트 에이전트]` 역할 표기를 둔다. PR에는 `Closes #<issue>`, 사용자 흐름·제외 범위, 사용 endpoint/오류 계약, 캐시·mutation·접근성·반응형 동작, 명령과 수치, Browser 확인/미확인 항목, 새 환경변수와 수동 확인을 적는다. QA 독립 판정을 대신 작성하지 않는다.
 
 QA 인계 문구:
 
 ```markdown
+## [프론트 에이전트]
+
 PR #<number> 최신 HEAD `<full-sha>`를 `reviewing-frontend-pull-requests`로 검증해 주세요.
 이슈 완료 조건과 정상·빈 상태·오류·재시도·중복 클릭·캐시·반응형·접근성을 확인하고 PR에 PASS/FAIL/BLOCKED를 남겨 주세요. 코드는 수정하거나 머지하지 마세요.
 ```

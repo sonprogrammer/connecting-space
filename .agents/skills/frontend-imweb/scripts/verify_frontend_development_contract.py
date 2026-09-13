@@ -26,6 +26,7 @@ checks = {
     "quality and security": all(term in skill for term in ("360px", "키보드", "aria", "NEXT_PUBLIC_", "service role")),
     "verification gates": all(cmd in skill for cmd in ("npm test", "npm run lint", "npm run type-check", "npm run build -- --webpack", "git diff --check")),
     "qa handoff": "reviewing-frontend-pull-requests" in skill and "Closes #<issue>" in skill and "최신 HEAD" in skill,
+    "role and markdown comments": "## [프론트 에이전트]" in skill and "실제 Markdown" in skill,
     "no merge deploy or remote db": all(term in skill for term in ("PR 머지", "배포", "remote DB")),
     "reference has required records": all(term in reference for term in ("RED", "GREEN", "REFACTOR", "계약 검사")),
     "pressure scenarios recorded": all(f"| {number} |" in pressure for number in range(1, 9)),
