@@ -17,6 +17,7 @@ checks = {
     "provider separation": "외부 전송과 핵심 저장을 분리" in skill,
     "verification gates": all(cmd in skill for cmd in ("npm test", "npm run lint", "npm run type-check", "npm run build -- --webpack", "git diff --check")),
     "qa handoff": "reviewing-backend-pull-requests" in skill and "Closes #<issue>" in skill,
+    "role in PR comments": "담당 역할: 백엔드 에이전트" in skill and "모든 PR/이슈 QA 코멘트" in skill,
     "reference resolves": "references/backend-development-reference.md" in skill,
     "red green refactor record": all(term in reference for term in ("RED", "GREEN", "REFACTOR")),
     "pressure scenarios recorded": all(f"| {number} |" in reference for number in range(1, 10)),

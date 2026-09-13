@@ -53,9 +53,13 @@ git diff --check <base>...HEAD
 
 DB 변경이면 migration-from-zero, RPC/RLS/trigger, 동시성·rollback·멱등·retry·만료·폐기 및 기존 DB 회귀 통합 suite를 추가한다. DB suite가 skip된 `npm test`만으로 통합 검증 완료를 주장하지 않는다.
 
-PR 본문에는 `Closes #<issue>`, 변경 요약, migration과 원격 미적용 사실, 새 환경변수, 테스트 수치/명령, 보안·RLS·멱등성 검증, 남은 운영 수동 확인, Frontend 계약을 한글로 작성한다. QA에는 다음 문구를 사용한다.
+PR 본문과 모든 PR/이슈 QA 코멘트에는 첫 줄 또는 제목으로 담당 역할을 반드시 명시한다: `담당 역할: 백엔드 에이전트`. PR 본문에는 `Closes #<issue>`, 변경 요약, migration과 원격 미적용 사실, 새 환경변수, 테스트 수치/명령, 보안·RLS·멱등성 검증, 남은 운영 수동 확인, Frontend 계약을 한글로 작성한다. QA 코멘트에는 역할·대상 full SHA·검증 결과·재현 명령을 Markdown으로 기록하고 다음 문구를 사용한다.
 
 ```markdown
+## 담당 역할
+
+백엔드 에이전트
+
 PR #<number> 최신 HEAD `<full-sha>`를 `reviewing-backend-pull-requests`로 검증해 주세요.
 API·인증·RLS·migration·원자성·멱등성·동시성·retry·비밀 비노출을 확인하고 PR에 PASS/FAIL/BLOCKED를 남겨 주세요. 원격 DB와 코드는 변경하거나 머지하지 마세요.
 ```
