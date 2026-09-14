@@ -9,6 +9,14 @@ const migrationPath = path.resolve(
 );
 
 describe("견적 버전·승인 migration", () => {
+  test("공개 승인 감사 필드와 상태 RPC를 append-only로 추가한다", () => {
+    const sql = readFileSync(path.resolve(process.cwd(), "supabase/migrations/202609140001_public_quote_approval_audit.sql"), "utf8") + readFileSync(path.resolve(process.cwd(), "supabase/migrations/202609140002_public_quote_api_contract.sql"), "utf8");
+    assert.match(sql, /add column approver_name text/);
+    assert.match(sql, /add column consent_version text/);
+    assert.match(sql, /get_public_quote_status/);
+    assert.match(sql, /approve_quote_by_token_legacy/);
+    assert.match(sql, /grant execute on function public\.approve_quote_by_token/);
+  });
   test("견적·버전·토큰·승인 테이블의 무결성과 관리자 RLS를 정의한다", () => {
     const sql = readFileSync(migrationPath, "utf8");
 
