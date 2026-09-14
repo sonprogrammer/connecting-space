@@ -9,6 +9,11 @@ Before running tests capture:
 - PR QA instructions, migration/environment/deploy notes
 - repository `AGENTS.md`, changed files, complete diff, and CI/Preview state
 
+CI evidence is valid only when the run/check is tied to the exact full HEAD. Developer self-validation, PR descriptions, and agent comments are context, not CI. Keep two separate evidence sections in the final comment:
+
+- `CI에서 인용한 검사`: exact-HEAD green `npm test`, lint, type-check, and build; cite them without repeating.
+- `QA가 직접 실행한 검사`: targeted state, interaction, accessibility, responsive, API, and any missing/failed/stale automatic checks.
+
 Run `git diff-tree --check` (or the equivalent `git diff --check <base>...<head>`) and inspect for unrelated generated files, secrets, debug logs, and unsafe client exposure. For Next.js behavior, consult the installed `node_modules/next/dist/docs/` version-specific docs.
 
 ## State matrix
@@ -37,7 +42,7 @@ When Browser, administrator credentials, or real operational data are unavailabl
 2. A new commit after testing invalidates the prior verdict; re-anchor and rerun.
 3. Node 20.8 build failure with Node 20.19 available: rerun with 20.19; do not call product FAIL from the first attempt.
 4. Visual success cannot mask duplicate mutation or input loss: mark MAJOR and FAIL with a minimal reproduction.
-5. Developer-reported results are context only; run commands independently at the fixed HEAD.
+5. Developer-reported results are context only; do not label them CI. Run only risk-targeted commands independently at the fixed HEAD, plus any automatic check missing/failed/stale in CI.
 6. Never request an admin password/account; route live checks to the manual list.
 
 ## Comment template
@@ -49,11 +54,14 @@ When Browser, administrator credentials, or real operational data are unavailabl
 - base: `<branch>`
 - 검증 범위: `<요구사항 요약>`
 
-### 자동 검증
+### CI에서 인용한 검사
+- `<CI run/check URL or name>` — exact HEAD `<full-sha>`
 - `npm test`: PASS — <tests>/<tests>
 - `npm run lint`: PASS
 - `npm run type-check`: PASS
 - `npm run build -- --webpack`: PASS
+
+### QA가 직접 실행한 검사
 - `git diff --check <base>...<head>`: PASS
 
 ### 기능·코드 검증

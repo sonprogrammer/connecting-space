@@ -7,6 +7,10 @@ skill = (ROOT / "SKILL.md").read_text()
 reference = (ROOT / "references" / "frontend-pr-qa-reference.md").read_text()
 
 checks = {
+    "ci evidence boundary": "신뢰 가능한 CI" in skill and "개발자 자체검증" in skill,
+    "avoid duplicate green suites": "반복 실행하지 않는다" in skill and "CI에서 인용한 검사" in reference,
+    "direct qa section": "QA가 직접 실행한 검사" in reference,
+    "targeted interaction matrix": all(term in skill for term in ("상태", "상호작용", "접근성", "반응형")),
     "browser fallback": "do not BLOCK or HOLD solely" in skill and "수동 확인" in skill,
     "head invalidation": "If HEAD changes, discard" in skill and "invalidates the prior verdict" in reference,
     "node retry": "Node 20.9+" in skill and "20.8" in reference,

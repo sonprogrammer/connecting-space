@@ -7,6 +7,10 @@ skill = (ROOT / "SKILL.md").read_text()
 reference = (ROOT / "references" / "backend-pr-qa-reference.md").read_text()
 
 checks = {
+    "ci evidence boundary": "신뢰 가능한 CI" in skill and "개발자 자체검증" in skill,
+    "avoid duplicate green suites": "반복 실행하지 않는다" in skill and "CI에서 인용한 검사" in reference,
+    "direct qa section": "QA가 직접 실행한 검사" in reference,
+    "db target matrix": all(term in skill for term in ("migration-from-zero", "RLS", "rollback", "동시성·멱등성")),
     "latest head invalidates verdict": "If HEAD changes, discard" in skill and "new HEAD or migration invalidates" in reference,
     "local db required": "isolated local Supabase" in skill and "verdict is `BLOCKED`" in reference,
     "remote migration forbidden": "Never run `supabase db push`" in skill and "migration repair" in reference,

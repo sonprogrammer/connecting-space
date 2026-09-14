@@ -2,7 +2,16 @@
 
 ## Required evidence
 
-Capture PR URL/number, base, full HEAD SHA, issue criteria/design decisions, API/migration/env notes, `AGENTS.md`, changed files and full diff, migration order, and CI status. Run `git diff --check <base>...<head>`. Inspect lockfiles, env examples, generated types, unrelated files, remote URLs, customer data, secrets, and debug logs. Use installed Next.js docs when Route Handler behavior matters.
+Capture PR URL/number, base, full HEAD SHA, issue criteria/design decisions, API/migration/env notes, `AGENTS.md`, changed files and full diff, migration order, and CI status. A CI result counts only when its run/check is tied to the exact full HEAD; developer self-validation, PR descriptions, and agent comments are not CI. Run `git diff --check <base>...<head>`. Inspect lockfiles, env examples, generated types, unrelated files, remote URLs, customer data, secrets, and debug logs. Use installed Next.js docs when Route Handler behavior matters.
+
+## CI versus direct QA
+
+Keep two evidence sections in every comment:
+
+- `CI에서 인용한 검사`: exact-HEAD CI checks only. Cite green `npm test`, lint, type-check, and build without rerunning them.
+- `QA가 직접 실행한 검사`: risk-targeted commands and manual/API/database checks run by QA. If CI is absent, failed, stale, or incomplete, run the missing automatic check here.
+
+Do not claim a check passed merely because a developer or another agent reported it.
 
 ## Risk matrix
 
@@ -41,11 +50,14 @@ Missing provider credentials do not block code contract tests unless real delive
 - base: `<branch>`
 - 변경 위험: `<API | Auth | DB | Worker | Provider | Security>`
 
-### 자동 검증
+### CI에서 인용한 검사
+- `<CI run/check URL or name>` — exact HEAD `<full-sha>`
 - `npm test`: PASS — <pass>/<total>, skip <count>
 - `npm run lint`: PASS
 - `npm run type-check`: PASS
 - `npm run build -- --webpack`: PASS
+
+### QA가 직접 실행한 검사
 - `git diff --check <base>...<head>`: PASS
 
 ### API·보안·무결성 검증
@@ -53,6 +65,11 @@ Missing provider credentials do not block code contract tests unless real delive
 
 ### 로컬 DB 통합 검증
 - 대상: `<localhost/127.0.0.1 | DB 변경 없음>`
+- migration-from-zero: PASS | FAIL | BLOCKED
+- RLS/role policies: PASS | FAIL | BLOCKED
+- RPC/error contract: PASS | FAIL | BLOCKED
+- rollback/atomicity: PASS | FAIL | BLOCKED
+- concurrent duplicate/idempotent requests: PASS | FAIL | BLOCKED
 - 결과: PASS | FAIL | BLOCKED | N/A
 - 원격 DB 변경: 하지 않음
 

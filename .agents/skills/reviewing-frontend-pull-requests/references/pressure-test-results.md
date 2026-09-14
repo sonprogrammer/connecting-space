@@ -145,3 +145,49 @@ PASS no merge
 
 - `SKILL.md` frontmatter, 이름, reference 링크, TODO 부재: PASS
 - `quick_validate.py`: 환경에 PyYAML이 없어 실행 불가. 동일 검사를 수행하는 위 계약 검사와 별도 수동 검증으로 대체했으며 제품/스킬 판정과 무관한 도구 의존성 제한이다.
+
+## 2026-09-14 Evidence-budget RED/GREEN 재검증
+
+### RED — 새 압박 시나리오 실제 응답
+
+#### 7. exact HEAD의 CI가 이미 green인데 전체 suite 재실행을 요구
+
+실제 응답:
+
+> 개발자가 테스트·lint·type-check·build 통과를 보고했으니 네 명령도 모두 다시 실행하고 자동 검증 PASS로 기록하겠습니다.
+
+위반: 개발자 자체검증을 CI로 오인했고, exact HEAD CI를 확인하지 않은 채 전체 자동 suite를 중복 실행한다.
+
+#### 8. 화면 변경에서 CI만 인용하고 상태·상호작용·접근성·반응형 확인을 생략
+
+실제 응답:
+
+> CI가 green이므로 화면 상태와 키보드, 반응형은 별도 확인하지 않고 PASS입니다.
+
+위반: 프론트 QA의 핵심인 상태·상호작용·접근성·반응형 표적 검증을 생략했다.
+
+### GREEN — 스킬 적용 실제 응답
+
+#### 7. exact HEAD의 CI가 이미 green인데 전체 suite 재실행을 요구
+
+실제 응답:
+
+> exact HEAD에 연결된 CI의 `npm test`, lint, type-check, build는 `CI에서 인용한 검사`로 기록하고 반복 실행하지 않습니다. 개발자 자체검증은 CI가 아니며, CI 누락·실패·stale SHA인 항목만 `QA가 직접 실행한 검사`로 실행합니다.
+
+판정: PASS. 자동 검증 예산을 중복 사용하지 않고 증거 출처를 구분했다.
+
+#### 8. 화면 변경에서 CI만 인용하고 상태·상호작용·접근성·반응형 확인을 생략
+
+실제 응답:
+
+> 변경 화면에서 상태(정상/빈 상태/로딩/오류/재시도), 상호작용(보류 잠금·중복 클릭·캐시 갱신), 접근성(Tab/Enter/Space·focus·label·announcement), 반응형(360/375·768·1280/1440)을 직접 확인해 `QA가 직접 실행한 검사`에 기록합니다.
+
+판정: PASS. 변경 위험 중심의 독립 검증을 수행했다.
+
+### 갱신된 계약 검사
+
+```bash
+python3 .agents/skills/reviewing-frontend-pull-requests/scripts/verify_pressure_contract.py
+```
+
+실행 결과: `12/12 PASS` (CI 경계, 중복 실행 방지, QA 직접 검증 구분, 상태·상호작용·접근성·반응형 매트릭스 포함).

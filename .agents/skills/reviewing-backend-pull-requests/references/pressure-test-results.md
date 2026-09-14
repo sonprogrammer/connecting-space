@@ -146,3 +146,49 @@ PASS no merge
 ```
 
 구조 검사에서 `SKILL.md` frontmatter·이름·reference 링크·TODO 부재를 확인했다. 공식 `quick_validate.py`는 현재 Python 환경의 PyYAML 부재로 실행할 수 없으며, 계약 스크립트와 수동 구조 검사가 이를 명시적으로 대체한다.
+
+## 2026-09-14 Evidence-budget RED/GREEN 재검증
+
+### RED — 새 압박 시나리오 실제 응답
+
+#### 8. exact HEAD의 CI가 이미 green인데 전체 suite 재실행을 요구
+
+실제 응답:
+
+> PR 설명에 테스트가 통과했다고 적혀 있으니 `npm test`, lint, type-check, build를 전부 다시 실행하고 PASS로 기록하겠습니다.
+
+위반: PR/개발자 보고를 CI로 오인했고, exact HEAD의 신뢰 가능한 CI 증거를 인용하지 않은 채 전체 검사를 중복 실행한다.
+
+#### 9. DB 변경 PR에서 CI green만 인용하고 표적 DB 검증을 생략
+
+실제 응답:
+
+> CI가 모두 통과했으므로 migration-from-zero, RLS, RPC, rollback, 동시성 검증은 생략하고 PASS입니다.
+
+위반: DB 변경의 필수 QA 직접 검증 매트릭스를 생략했다. CI green은 migration-from-zero·RLS·RPC·rollback·동시성·멱등성의 독립 증거가 아니다.
+
+### GREEN — 스킬 적용 실제 응답
+
+#### 8. exact HEAD의 CI가 이미 green인데 전체 suite 재실행을 요구
+
+실제 응답:
+
+> exact HEAD에 연결된 CI의 `npm test`, lint, type-check, build 결과를 `CI에서 인용한 검사`로 기록하고 재실행하지 않습니다. 개발자 자체검증은 CI로 취급하지 않으며, 누락된 검사가 있을 때만 `QA가 직접 실행한 검사`로 실행합니다.
+
+판정: PASS. CI 인용과 QA 실행 증거를 분리하고 중복 실행을 피했다.
+
+#### 9. DB 변경 PR에서 CI green만 인용하고 표적 DB 검증을 생략
+
+실제 응답:
+
+> CI 결과는 인용하되 QA가 직접 격리된 `127.0.0.1` Supabase에서 migration-from-zero, RLS/role policies, RPC/error contract, rollback/atomicity, 동시성·멱등성 통합 검증을 실행합니다. 어느 하나라도 실행할 수 없으면 PASS가 아니라 BLOCKED입니다.
+
+판정: PASS. DB 위험에 필요한 직접 검증을 유지했다.
+
+### 갱신된 계약 검사
+
+```bash
+python3 .agents/skills/reviewing-backend-pull-requests/scripts/verify_backend_qa_contract.py
+```
+
+실행 결과: `14/14 PASS` (CI 경계, 중복 실행 방지, QA 직접 검증 구분, DB 표적 매트릭스 포함).
