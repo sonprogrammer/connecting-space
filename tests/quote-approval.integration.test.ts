@@ -137,6 +137,8 @@ describe("로컬 견적 승인 PostgreSQL 통합", { skip: !enabled }, () => {
         p_token_hash: secondToken.tokenHash,
         p_client_ip: "203.0.113.10",
         p_user_agent: "integration-a",
+        p_approver_name: "홍길동",
+        p_consent_version: "2026-09-14",
       }),
       anon.rpc("approve_quote_by_token", {
         p_token_hash: secondToken.tokenHash,
@@ -156,6 +158,8 @@ describe("로컬 견적 승인 PostgreSQL 통합", { skip: !enabled }, () => {
       .select("id", { count: "exact", head: true })
       .eq("quote_version_id", versionOneId);
     assert.equal(approvalCount.count, 1);
+    const approvalAudit = await service.from("quote_approvals").select("approver_name,consent_version").eq("quote_version_id", versionOneId).single();
+    assert.deepEqual(approvalAudit.data, { approver_name: "홍길동", consent_version: "2026-09-14" });
 
     const versionTwo = await admin.rpc("create_quote_version", {
       p_quote_id: quoteId,

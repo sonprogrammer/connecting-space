@@ -2,6 +2,7 @@ import { isIP } from "node:net";
 import type { NextRequest } from "next/server";
 
 import { hashApprovalToken } from "@/entities/quote/server/token";
+import { publicQuoteApprovalSchema, PUBLIC_CONSENT_VERSION } from "@/entities/quote/api/public-approval";
 import { jsonError, jsonOk } from "@/shared/api/response";
 import { createSupabaseServerClient } from "@/shared/lib/supabase/server";
 
@@ -19,11 +20,18 @@ export async function POST(request: NextRequest, context: Context) {
     );
   }
 
+  let input: unknown;
+  try { input = await request.json(); } catch { return jsonError("QUOTE_APPROVAL_INVALID_INPUT", "Invalid approval request", 400); }
+  const parsed = publicQuoteApprovalSchema.safeParse(input);
+  if (!parsed.success) return jsonError("QUOTE_APPROVAL_INVALID_INPUT", "Invalid approval request", 400);
+
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase.rpc("approve_quote_by_token", {
     p_token_hash: tokenHash,
     p_client_ip: trustedClientIp(request),
     p_user_agent: sanitizeUserAgent(request.headers.get("user-agent")),
+    p_approver_name: parsed.data.approverName,
+    p_consent_version: PUBLIC_CONSENT_VERSION,
   });
   if (error) {
     return jsonError(

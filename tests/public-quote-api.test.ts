@@ -89,7 +89,7 @@ describe("공개 견적 조회 API", () => {
       balanceTerms: "검수 후",
       expiresAt: "2026-09-14T00:00:00Z",
     });
-    assert.equal(new URL(fake.requests[0].url).pathname, "/rest/v1/rpc/get_public_quote_by_token");
+    assert.equal(new URL(fake.requests[0].url).pathname, "/rest/v1/rpc/get_public_quote_status");
     assert.deepEqual(JSON.parse(fake.requests[0].body), {
       p_token_hash: hashApprovalToken(token),
     });
@@ -107,9 +107,33 @@ describe("공개 견적 조회 API", () => {
     assert.equal(body.error.code, "QUOTE_LINK_EXPIRED");
     assert.equal(JSON.stringify(body).includes("customer"), false);
   });
+
+  test("승인된 토큰은 완료 화면용 최소 정보만 반환한다", async () => {
+    const fake = createTestClient([ok([{ availability: "approved", quote_id: quoteId, quote_version_id: versionId }])]);
+    publicClient = fake.client;
+    const response = await quoteRoute.GET(new NextRequest(`http://localhost/api/quotes/${token}`), context(token));
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).data, { quoteId, quoteVersionId: versionId, status: "approved" });
+  });
+
+  test("취소된 토큰은 안정적인 취소 오류를 반환한다", async () => {
+    const fake = createTestClient([ok([{ availability: "cancelled" }])]);
+    publicClient = fake.client;
+    const response = await quoteRoute.GET(new NextRequest(`http://localhost/api/quotes/${token}`), context(token));
+    assert.equal(response.status, 410);
+    assert.equal((await response.json()).error.code, "QUOTE_LINK_CANCELLED");
+  });
 });
 
 describe("공개 견적 승인 API", () => {
+  test("승인자·동의가 없으면 mutation 전에 400으로 거부한다", async () => {
+    const fake = createTestClient([]);
+    publicClient = fake.client;
+    const response = await approveRoute.POST(new NextRequest(`http://localhost/api/quotes/${token}/approve`, { method: "POST", body: JSON.stringify({ approverName: "", consentAccepted: false }), headers: { "content-type": "application/json" } }), context(token));
+    assert.equal(response.status, 400);
+    assert.equal(fake.requests.length, 0);
+  });
+
   test("POST는 해시와 제한된 감사 정보만 원자 승인 RPC에 전달한다", async () => {
     const approvedAt = "2026-09-07T00:00:00Z";
     const fake = createTestClient([
@@ -119,7 +143,8 @@ describe("공개 견적 승인 API", () => {
     const response = await approveRoute.POST(
       new NextRequest(`http://localhost/api/quotes/${token}/approve`, {
         method: "POST",
-        headers: {
+        body: JSON.stringify({ approverName: " 홍길동 ", consentAccepted: true }),
+        headers: { "content-type": "application/json",
           "user-agent": "Test Browser",
           "x-vercel-forwarded-for": "203.0.113.10, 10.0.0.1",
         },
@@ -134,6 +159,8 @@ describe("공개 견적 승인 API", () => {
       p_token_hash: hashApprovalToken(token),
       p_client_ip: "203.0.113.10",
       p_user_agent: "Test Browser",
+      p_approver_name: "홍길동",
+      p_consent_version: "2026-09-14",
     });
   });
 
@@ -141,7 +168,7 @@ describe("공개 견적 승인 API", () => {
     const fake = createTestClient([ok([{ result: "unavailable" }])]);
     publicClient = fake.client;
     const response = await approveRoute.POST(
-      new NextRequest(`http://localhost/api/quotes/${token}/approve`, { method: "POST" }),
+      new NextRequest(`http://localhost/api/quotes/${token}/approve`, { method: "POST", body: JSON.stringify({ approverName: "홍길동", consentAccepted: true }), headers: { "content-type": "application/json" } }),
       context(token),
     );
     assert.equal(response.status, 409);

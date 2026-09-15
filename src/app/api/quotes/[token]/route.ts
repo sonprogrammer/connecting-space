@@ -16,7 +16,7 @@ export async function GET(_request: NextRequest, context: Context) {
   }
 
   const supabase = createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("get_public_quote_by_token", {
+  const { data, error } = await supabase.rpc("get_public_quote_status", {
     p_token_hash: tokenHash,
   });
   if (error) {
@@ -30,6 +30,13 @@ export async function GET(_request: NextRequest, context: Context) {
   const row = data?.[0];
   if (row?.availability === "expired") {
     return jsonError("QUOTE_LINK_EXPIRED", "Quote link has expired", 410);
+  }
+  if (row?.availability === "cancelled") {
+    return jsonError("QUOTE_LINK_CANCELLED", "Quote link has been cancelled", 410);
+  }
+  if (row?.availability === "approved") {
+    if (!row.quote_id || !row.quote_version_id) return unavailableResponse();
+    return jsonOk({ quoteId: row.quote_id, quoteVersionId: row.quote_version_id, status: "approved" as const });
   }
   if (
     row?.availability !== "available" ||
