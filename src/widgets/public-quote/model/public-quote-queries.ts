@@ -28,9 +28,18 @@ export function fetchPublicQuote(token: string): Promise<PublicQuoteSnapshot> {
   return request<PublicQuoteSnapshot>(`/api/quotes/${encodeURIComponent(token)}`);
 }
 
-export function approvePublicQuote(token: string): Promise<{ quoteId: string; quoteVersionId: string; approvedAt: string }> {
+export type PublicQuoteApprovalInput = {
+  approverName: string;
+  consentAccepted: true;
+};
+
+export function approvePublicQuote(token: string, input: PublicQuoteApprovalInput): Promise<{ quoteId: string; quoteVersionId: string; approvedAt: string }> {
   return request(`/api/quotes/${encodeURIComponent(token)}/approve`, {
     method: "POST",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      approverName: input.approverName.trim(),
+      consentAccepted: true,
+    }),
   });
 }

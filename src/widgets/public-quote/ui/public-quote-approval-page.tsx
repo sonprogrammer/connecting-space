@@ -54,7 +54,10 @@ export function PublicQuoteApprovalPage({ token }: Readonly<{ token: string }>) 
 
     setSubmitting(true);
     try {
-      await approvePublicQuote(token);
+      await approvePublicQuote(token, {
+        approverName: customerName.trim(),
+        consentAccepted: true,
+      });
       setState("approved");
     } catch (error: unknown) {
       setState(error instanceof PublicQuoteRequestError ? getPublicQuoteErrorState(error.status) : "error");
