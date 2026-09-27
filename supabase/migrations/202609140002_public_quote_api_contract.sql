@@ -15,9 +15,6 @@ end; $$;
 
 revoke all on function public.get_public_quote_status(text) from public;
 grant execute on function public.get_public_quote_status(text) to anon, authenticated, service_role;
-revoke all on function public.approve_quote_by_token(text, text, text, text, text) from public;
-grant execute on function public.approve_quote_by_token(text, text, text, text, text) to anon, authenticated, service_role;
-
 alter function public.approve_quote_by_token(text, text, text) rename to approve_quote_by_token_legacy;
 revoke all on function public.approve_quote_by_token_legacy(text, text, text) from public;
 create function public.approve_quote_by_token(p_token_hash text, p_client_ip text default null, p_user_agent text default null, p_approver_name text default null, p_consent_version text default null)
@@ -32,3 +29,6 @@ begin
   if result_row.result = 'approved' and p_approver_name is not null then update quote_approvals set approver_name=p_approver_name, consent_version=p_consent_version where quote_version_id=result_row.approved_quote_version_id; end if;
   return query select result_row.result, result_row.approved_quote_id, result_row.approved_quote_version_id, result_row.approved_at;
 end; $$;
+
+revoke all on function public.approve_quote_by_token(text, text, text, text, text) from public;
+grant execute on function public.approve_quote_by_token(text, text, text, text, text) to anon, authenticated, service_role;
