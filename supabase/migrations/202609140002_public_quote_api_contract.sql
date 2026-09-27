@@ -21,18 +21,26 @@ create function public.approve_quote_by_token(p_token_hash text, p_client_ip tex
 returns table (result text, approved_quote_id uuid, approved_quote_version_id uuid, approved_at timestamptz)
 language plpgsql security definer set search_path = public
 as $$
-declare existing record; result_row record;
+declare token_row public.quote_approval_tokens%rowtype; version_row public.quote_versions%rowtype; quote_row public.quotes%rowtype; approval_time timestamptz := now(); existing record;
 begin
-  select a.quote_id, a.quote_version_id, a.approved_at into existing from quote_approval_tokens t join quote_approvals a on a.approval_token_id=t.id where t.token_hash=p_token_hash for update;
-  if found then
-    if p_approver_name is not null and p_consent_version is not null then
-      update quote_approvals set approver_name = p_approver_name, consent_version = p_consent_version where quote_version_id = existing.quote_version_id and (approver_name is null or consent_version is null);
-    end if;
-    return query select 'approved'::text, existing.quote_id, existing.quote_version_id, existing.approved_at; return;
+  select a.quote_id, a.quote_version_id, a.approved_at into existing
+    from public.quote_approval_tokens t join public.quote_approvals a on a.approval_token_id = t.id
+    where t.token_hash = p_token_hash for update;
+  if found then return query select 'approved'::text, existing.quote_id, existing.quote_version_id, existing.approved_at; return; end if;
+  select * into token_row from public.quote_approval_tokens where token_hash = p_token_hash for update;
+  if not found then return query select 'unavailable'::text, null::uuid, null::uuid, null::timestamptz; return; end if;
+  select * into version_row from public.quote_versions where id = token_row.quote_version_id;
+  select * into quote_row from public.quotes where id = version_row.quote_id for update;
+  if token_row.expires_at is not null and token_row.expires_at <= approval_time then return query select 'expired'::text, null::uuid, null::uuid, null::timestamptz; return; end if;
+  if quote_row.status <> 'sent' or token_row.expires_at is null or token_row.revoked_at is not null or token_row.used_at is not null or token_row.replaced_by_id is not null or quote_row.latest_version_id <> version_row.id then
+    return query select 'unavailable'::text, null::uuid, null::uuid, null::timestamptz; return;
   end if;
-  select * into result_row from public.approve_quote_by_token_legacy(p_token_hash, p_client_ip, p_user_agent);
-  if result_row.result = 'approved' and p_approver_name is not null then update quote_approvals set approver_name=p_approver_name, consent_version=p_consent_version where quote_version_id=result_row.approved_quote_version_id; end if;
-  return query select result_row.result, result_row.approved_quote_id, result_row.approved_quote_version_id, result_row.approved_at;
+  insert into public.quote_approvals(quote_id, quote_version_id, approval_token_id, approved_at, client_ip, user_agent, approver_name, consent_version)
+    values (quote_row.id, version_row.id, token_row.id, approval_time, nullif(p_client_ip, '')::inet, left(nullif(p_user_agent, ''), 500), p_approver_name, p_consent_version);
+  update public.quote_approval_tokens set used_at = approval_time where id = token_row.id;
+  update public.quote_email_deliveries set superseded_at = approval_time where approval_token_id = token_row.id and superseded_at is null;
+  update public.quotes set status = 'approved', approved_version_id = version_row.id where id = quote_row.id;
+  return query select 'approved'::text, quote_row.id, version_row.id, approval_time;
 end; $$;
 
 revoke all on function public.approve_quote_by_token(text, text, text, text, text) from public;

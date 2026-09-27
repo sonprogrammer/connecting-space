@@ -29,7 +29,7 @@ begin
   end if;
   select coalesce(max(generation), 0) + 1 into next_generation from public.quote_email_deliveries where quote_version_id = p_quote_version_id;
   insert into public.quote_approval_tokens(id, quote_version_id, token_hash, expires_at, created_by, created_at)
-    values (p_token_id, p_quote_version_id, p_token_hash, p_now + interval '7 days', auth.uid(), p_now);
+    values (p_token_id, p_quote_version_id, p_token_hash, null, auth.uid(), p_now);
   insert into public.quote_email_deliveries(id, quote_id, quote_version_id, approval_token_id, generation, encrypted_payload, payload_nonce, payload_auth_tag, available_at)
     values (p_job_id, quote_row.id, p_quote_version_id, p_token_id, next_generation, p_encrypted_payload, p_payload_nonce, p_payload_auth_tag, p_now)
     returning * into created_delivery;

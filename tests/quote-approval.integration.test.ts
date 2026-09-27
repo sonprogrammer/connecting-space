@@ -161,7 +161,12 @@ describe("로컬 견적 승인 PostgreSQL 통합", { skip: !enabled }, () => {
       .eq("quote_version_id", versionOneId);
     assert.equal(approvalCount.count, 1);
     const approvalAudit = await service.from("quote_approvals").select("approver_name,consent_version").eq("quote_version_id", versionOneId).single();
-    assert.deepEqual(approvalAudit.data, { approver_name: "김후속", consent_version: "2026-09-14" });
+    const winningIndex = approvals.findIndex((approval) => approval.data?.[0]?.result === "approved");
+    assert.notEqual(winningIndex, -1);
+    assert.deepEqual(approvalAudit.data, {
+      approver_name: winningIndex === 0 ? "홍길동" : "김후속",
+      consent_version: "2026-09-14",
+    });
 
     const versionTwo = await admin.rpc("create_quote_version", {
       p_quote_id: quoteId,
