@@ -10,6 +10,8 @@ export type {
 } from "./api/contracts";
 export type { ConfirmQuoteContractInput, ConfirmQuoteContractResponse } from "./api/contract-conversion";
 export { confirmQuoteContractSchema } from "./api/contract-conversion";
+export { publicQuoteApprovalSchema, PUBLIC_CONSENT_VERSION } from "./api/public-approval";
+export type { PublicQuoteApprovalInput } from "./api/public-approval";
 export {
   createQuoteSchema,
   manualQuoteDeliverySchema,
