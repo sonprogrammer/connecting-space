@@ -56,6 +56,7 @@ describe("로컬 견적 이메일 PostgreSQL 통합", { skip: !enabled }, () => 
     assert.equal(deliveries.data?.length, 1);
     assert.equal(tokens.data?.length, 1);
     assert.equal(tokens.data?.[0]?.expires_at, null);
+    assert.equal(tokens.data?.[0]?.created_at, "2026-09-07T02:59:00+00:00");
     assert.equal((await service.from("quotes").select("status").eq("id", quoteId).single()).data?.status, "draft");
     const serialized = JSON.stringify(deliveries.data?.[0]);
     assert.doesNotMatch(serialized, /recipient@local\.test|approval-token|\/quotes\//);

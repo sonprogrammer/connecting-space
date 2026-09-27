@@ -683,11 +683,14 @@ export type Database = {
           expires_at: string | null;
         }>;
       };
+      get_public_quote_status: Database["public"]["Functions"]["get_public_quote_by_token"];
       approve_quote_by_token: {
         Args: {
           p_token_hash: string;
           p_client_ip?: string | null;
           p_user_agent?: string | null;
+          p_approver_name?: string | null;
+          p_consent_version?: string | null;
         };
         Returns: Array<{
           result: string;
