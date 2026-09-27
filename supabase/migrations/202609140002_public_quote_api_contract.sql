@@ -23,8 +23,13 @@ language plpgsql security definer set search_path = public
 as $$
 declare existing record; result_row record;
 begin
-  select a.quote_id, a.quote_version_id, a.approved_at into existing from quote_approval_tokens t join quote_approvals a on a.approval_token_id=t.id where t.token_hash=p_token_hash;
-  if found then return query select 'approved'::text, existing.quote_id, existing.quote_version_id, existing.approved_at; return; end if;
+  select a.quote_id, a.quote_version_id, a.approved_at into existing from quote_approval_tokens t join quote_approvals a on a.approval_token_id=t.id where t.token_hash=p_token_hash for update;
+  if found then
+    if p_approver_name is not null and p_consent_version is not null then
+      update quote_approvals set approver_name = p_approver_name, consent_version = p_consent_version where quote_version_id = existing.quote_version_id and (approver_name is null or consent_version is null);
+    end if;
+    return query select 'approved'::text, existing.quote_id, existing.quote_version_id, existing.approved_at; return;
+  end if;
   select * into result_row from public.approve_quote_by_token_legacy(p_token_hash, p_client_ip, p_user_agent);
   if result_row.result = 'approved' and p_approver_name is not null then update quote_approvals set approver_name=p_approver_name, consent_version=p_consent_version where quote_version_id=result_row.approved_quote_version_id; end if;
   return query select result_row.result, result_row.approved_quote_id, result_row.approved_quote_version_id, result_row.approved_at;
