@@ -11,6 +11,7 @@ import { AdminInquiryList } from "./admin-inquiry-list";
 import { AdminPortfolioManager } from "@/widgets/admin-portfolio";
 import { AdminAutomationContentManager } from "@/widgets/admin-automation-content";
 import { AdminCustomerProjectManager } from "@/widgets/admin-customer-projects";
+import { AdminQuoteWorkflow } from "@/widgets/admin-quote-workflow";
 
 const stats = [
   { label: "신규 문의", value: "7", change: "+3 이번 주", icon: MessageSquareMore },
@@ -61,6 +62,8 @@ export function AdminDashboard() {
 
         <div className="mt-6 grid gap-6">
           <AdminInquiryList />
+
+          <AdminQuoteWorkflow />
 
           <AdminCustomerProjectManager />
 
