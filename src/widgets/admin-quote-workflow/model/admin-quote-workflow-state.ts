@@ -93,3 +93,9 @@ export function getQuoteDeliveryLabel(status: string): string {
 export function createIdempotencyKey(): string {
   return crypto.randomUUID();
 }
+
+export async function completeContractConfirmation<T>(request: () => Promise<T>, onSuccess: () => void): Promise<T> {
+  const result = await request();
+  onSuccess();
+  return result;
+}

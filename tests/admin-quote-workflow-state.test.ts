@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 
 import {
   calculateQuoteSplit,
+  completeContractConfirmation,
   getQuoteDeliveryLabel,
   getQuoteStatusLabel,
   toQuoteSnapshotPayload,
@@ -70,5 +71,21 @@ describe("admin quote workflow state", () => {
     assert.equal(getQuoteStatusLabel("expired"), "만료됨");
     assert.equal(getQuoteDeliveryLabel("failed"), "발송 실패");
     assert.equal(getQuoteDeliveryLabel("retry"), "재시도 대기");
+  });
+
+  test("marks contract confirmation complete only after the request resolves and allows retry after failure", async () => {
+    let calls = 0;
+    let completed = 0;
+    const request = async () => {
+      calls += 1;
+      if (calls === 1) throw new Error("temporary failure");
+      return { projectId: "project-1" };
+    };
+
+    await assert.rejects(() => completeContractConfirmation(request, () => { completed += 1; }));
+    assert.equal(completed, 0);
+    await completeContractConfirmation(request, () => { completed += 1; });
+    assert.equal(calls, 2);
+    assert.equal(completed, 1);
   });
 });
