@@ -87,6 +87,9 @@ describe("관리자 견적 PDF 수동 발급 API", { concurrency: false }, () =>
     assert.equal(response.headers.get("content-type"), "application/pdf");
     assert.equal(response.headers.get("cache-control"), "no-store");
     assert.equal(response.headers.get("x-quote-manual-delivery-id"), deliveryId);
+    const versionRead = fake.requests.find((request) => request.url.includes("/quote_versions?"));
+    assert.ok(versionRead);
+    assert.match(decodeURIComponent(versionRead.url), /quotes!quote_versions_quote_id_fkey/);
     assert.equal(response.headers.get("x-quote-expires-at"), delivery.expires_at);
     assert.match(response.headers.get("content-disposition") ?? "", /attachment/);
     assert.equal(renderedPayloads.length, 2);

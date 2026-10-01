@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, context: Context) {
 
   const { data: version, error: versionError } = await verified.supabase
     .from("quote_versions")
-    .select("id,quote_id,title,body,scope_items,total_amount,estimated_start_date,estimated_end_date,deposit_amount,balance_amount,deposit_terms,balance_terms,quotes!inner(id,inquiry_id,status,latest_version_id)")
+    .select("id,quote_id,title,body,scope_items,total_amount,estimated_start_date,estimated_end_date,deposit_amount,balance_amount,deposit_terms,balance_terms,quotes!quote_versions_quote_id_fkey(id,inquiry_id,status,latest_version_id)")
     .eq("id", id.data)
     .maybeSingle();
   if (versionError) {
