@@ -290,6 +290,8 @@ export type Database = {
           approved_at: string;
           client_ip: string | null;
           user_agent: string | null;
+          approver_name: string | null;
+          consent_version: string | null;
         };
         Insert: {
           id?: string;
@@ -299,6 +301,8 @@ export type Database = {
           approved_at?: string;
           client_ip?: string | null;
           user_agent?: string | null;
+          approver_name?: string | null;
+          consent_version?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["quote_approvals"]["Insert"]>;
         Relationships: [];
