@@ -18,3 +18,7 @@ export {
 export { AdminThemeControl } from "./ui/admin-theme-control";
 export { AdminThemeProvider, useAdminTheme } from "./ui/admin-theme-provider";
 export { AdminThemeScript } from "./ui/admin-theme-script";
+export { AdminMobileDrawer } from "./ui/admin-mobile-drawer";
+export { AdminMobileHeader } from "./ui/admin-mobile-header";
+export { AdminNavigationMenu, AdminSidebar } from "./ui/admin-sidebar";
+export { AdminShell } from "./ui/admin-shell";

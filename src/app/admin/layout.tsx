@@ -1,4 +1,5 @@
 import { AdminQueryProvider } from "./admin-query-provider";
+import { AdminShell, AdminThemeProvider } from "@/widgets/admin-shell";
 
 export default function AdminLayout({
   children,
@@ -6,8 +7,10 @@ export default function AdminLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <AdminQueryProvider>
-      <div className="min-h-screen bg-[#f5f6f3]">{children}</div>
-    </AdminQueryProvider>
+    <AdminThemeProvider>
+      <AdminQueryProvider>
+        <AdminShell>{children}</AdminShell>
+      </AdminQueryProvider>
+    </AdminThemeProvider>
   );
 }
