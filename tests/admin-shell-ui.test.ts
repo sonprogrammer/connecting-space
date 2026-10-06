@@ -46,6 +46,7 @@ describe("admin shell UI", () => {
     assert.match(drawerSource, /Dialog\.Close/);
     assert.match(shellSource, /href="#admin-main"/);
     assert.match(shellSource, /<main[^>]*id="admin-main"/);
+    assert.match(shellSource, /pathname === "\/admin" \? "" : "text-\[#17201a\]"/);
   });
 
   test("keeps the theme and mobile navigation entry point reachable on tablet", () => {

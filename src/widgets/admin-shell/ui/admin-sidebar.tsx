@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, type Ref } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
