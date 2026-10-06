@@ -24,6 +24,7 @@ import {
 } from "@/entities/inquiry";
 import { InquiryConversionPanel } from "@/features/convert-inquiry-to-project";
 import { InquiryReplyDraftPanel } from "@/features/manage-inquiry-reply";
+import { InquiryQuoteSummary } from "@/widgets/admin-inquiry-quotes";
 import { Button } from "@/shared/ui/button";
 import type { ApiResponse } from "@/shared/types/api";
 import { InquirySelectionButton } from "./inquiry-selection-button";
@@ -592,6 +593,8 @@ function InquiryDetailForm({
         </div>
 
         <InquiryReplyDraftPanel inquiryId={inquiry.id} />
+
+        <InquiryQuoteSummary inquiryId={inquiry.id} />
 
         <InquiryConversionPanel inquiry={inquiry} onInquiryUpdated={onUpdated} />
       </div>
