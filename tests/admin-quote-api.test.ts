@@ -13,6 +13,7 @@ type QuoteDetailRoute = typeof import("../src/app/api/admin/quotes/[id]/route");
 type QuoteVersionsRoute = typeof import("../src/app/api/admin/quotes/[id]/versions/route");
 type QuoteCancelRoute = typeof import("../src/app/api/admin/quotes/[id]/cancel/route");
 type QuoteTokenRoute = typeof import("../src/app/api/admin/quote-versions/[id]/approval-token/route");
+type InquiryQuotesRoute = typeof import("../src/app/api/admin/inquiries/[id]/quotes/route");
 
 type VerifiedAdmin =
   | { ok: true; supabase: SupabaseClient<Database> }
@@ -43,6 +44,7 @@ let quoteDetailRoute: QuoteDetailRoute;
 let quoteVersionsRoute: QuoteVersionsRoute;
 let quoteCancelRoute: QuoteCancelRoute;
 let quoteTokenRoute: QuoteTokenRoute;
+let inquiryQuotesRoute: InquiryQuotesRoute;
 
 before(() => {
   registerPathAlias();
@@ -61,11 +63,31 @@ before(() => {
   quoteCancelRoute = require("../src/app/api/admin/quotes/[id]/cancel/route");
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   quoteTokenRoute = require("../src/app/api/admin/quote-versions/[id]/approval-token/route");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  inquiryQuotesRoute = require("../src/app/api/admin/inquiries/[id]/quotes/route");
 });
 
 after(() => mock.restoreAll());
 
 describe("관리자 문의·견적 API", () => {
+  test("선택 문의의 견적 상태와 고객 승인 정보를 관리자에게 반환한다", async () => {
+    const approvedAt = "2026-09-14T03:00:00Z";
+    const fake = createTestClient([
+      ok({ id: inquiryId }),
+      ok([{ id: quoteId, inquiry_id: inquiryId, status: "approved", approved_version_id: versionId, created_at: "2026-09-10T00:00:00Z", updated_at: "2026-09-14T03:00:00Z" }]),
+      ok([{ quote_id: quoteId, quote_version_id: versionId, approver_name: "홍길동", consent_version: "2026-09-14", approved_at: approvedAt }]),
+    ]);
+    verifiedAdmin = { ok: true, supabase: fake.client };
+    const response = await inquiryQuotesRoute.GET(new NextRequest(`http://localhost/api/admin/inquiries/${inquiryId}/quotes`), context(inquiryId));
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).data, { quotes: [{ id: quoteId, inquiryId, status: "approved", approvedVersionId: versionId, createdAt: "2026-09-10T00:00:00Z", updatedAt: "2026-09-14T03:00:00Z", approval: { quoteVersionId: versionId, approverName: "홍길동", consentVersion: "2026-09-14", approvedAt } }] });
+  });
+
+  test("인증되지 않은 문의 견적 조회는 DB를 호출하지 않는다", async () => {
+    verifiedAdmin = { ok: false, response: NextResponse.json({ error: { code: "ADMIN_AUTH_REQUIRED" } }, { status: 401 }) };
+    const response = await inquiryQuotesRoute.GET(new NextRequest(`http://localhost/api/admin/inquiries/${inquiryId}/quotes`), context(inquiryId));
+    assert.equal(response.status, 401);
+  });
   test("인증되지 않은 견적 생성은 DB를 호출하지 않는다", async () => {
     verifiedAdmin = {
       ok: false,
