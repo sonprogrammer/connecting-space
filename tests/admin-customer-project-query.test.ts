@@ -78,4 +78,14 @@ describe("admin customer/project query model", () => {
     assert.match(source, /<ProjectEditor detail=\{detail\} onDetailRetry=\{onDetailRetry\}[^\n]*onLinkedCustomerRetry=\{onLinkedCustomerRetry\}/);
     assert.doesNotMatch(source, /queryRetryRegistry/);
   });
+
+  test("opens the route-requested customer or project tab", () => {
+    const source = readFileSync(
+      "src/widgets/admin-customer-projects/ui/admin-customer-project-manager.tsx",
+      "utf8",
+    );
+    assert.match(source, /initialTab = "customers"/);
+    assert.match(source, /useState<AdminCustomerProjectTab>\(initialTab\)/);
+    assert.doesNotMatch(source, /setTab\(initialTab\)/);
+  });
 });

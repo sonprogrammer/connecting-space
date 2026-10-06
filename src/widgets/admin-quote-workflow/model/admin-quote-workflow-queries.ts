@@ -9,6 +9,7 @@ import type {
 } from "@/entities/quote";
 import type { AdminInquiryDetail, AdminInquiryListItem } from "@/entities/inquiry";
 import type { ApiResponse } from "@/shared/types/api";
+import { redirectToAdminLogin } from "../../../shared/lib/auth/admin-login-redirect";
 
 export class AdminQuoteRequestError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) {
@@ -23,7 +24,7 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
     headers: { Accept: "application/json", ...(init?.body ? { "Content-Type": "application/json" } : {}), ...init?.headers },
   });
   if (response.status === 401 || response.status === 403) {
-    window.location.assign(`/admin/login?next=${encodeURIComponent(window.location.pathname)}`);
+    redirectToAdminLogin();
     throw new AdminQuoteRequestError(response.status, "ADMIN_AUTH_REQUIRED", "관리자 인증이 만료되었습니다.");
   }
   const result = (await response.json().catch(() => null)) as ApiResponse<T> | null;
@@ -97,7 +98,7 @@ export async function issueManualQuotePdf(versionId: string, input: ManualQuoteD
     body: JSON.stringify(input),
   });
   if (response.status === 401 || response.status === 403) {
-    window.location.assign(`/admin/login?next=${encodeURIComponent(window.location.pathname)}`);
+    redirectToAdminLogin();
     throw new AdminQuoteRequestError(response.status, "ADMIN_AUTH_REQUIRED", "관리자 인증이 만료되었습니다.");
   }
   if (!response.ok) {

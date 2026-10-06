@@ -22,6 +22,7 @@ import {
   type PortfolioFormValues,
 } from "@/features/manage-portfolio";
 import type { ApiResponse } from "@/shared/types/api";
+import { AdminLoginLink } from "@/shared/ui/admin-login-link";
 import { Button } from "@/shared/ui/button";
 
 import {
@@ -212,9 +213,9 @@ export function AdminPortfolioManager() {
               <span>
                 {saveError}
                 {saveError.startsWith("관리자 로그인이") ? (
-                  <a href="/admin/login?next=/admin" className="ml-2 font-semibold underline underline-offset-2">
+                  <AdminLoginLink className="ml-2 font-semibold underline underline-offset-2">
                     로그인하기
-                  </a>
+                  </AdminLoginLink>
                 ) : null}
               </span>
             </div>
@@ -259,12 +260,11 @@ function PortfolioList({
         <p className="mt-3 font-medium text-[#912018]">목록을 불러오지 못했습니다</p>
         <p className="mt-2 max-w-sm text-sm leading-6 text-[#617068]">{state.message}</p>
         {state.message.startsWith("관리자 로그인이") ? (
-          <a
-            href="/admin/login?next=/admin"
+          <AdminLoginLink
             className="mt-4 text-sm font-semibold text-[#912018] underline underline-offset-2"
           >
             로그인하기
-          </a>
+          </AdminLoginLink>
         ) : null}
       </div>
     );

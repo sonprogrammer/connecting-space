@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AdminThemeScript } from "@/widgets/admin-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -12,7 +13,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko" className="h-full antialiased">
+    <html lang="ko" className="h-full antialiased" suppressHydrationWarning>
+      <head>
+        <AdminThemeScript />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

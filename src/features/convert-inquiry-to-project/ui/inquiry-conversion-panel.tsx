@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2, UserRoundPlus } from "lucide-react";
 import type { AdminInquiryDetail } from "@/entities/inquiry";
 import { Button } from "@/shared/ui/button";
 import type { ApiResponse } from "@/shared/types/api";
+import { redirectToAdminLogin } from "@/shared/lib/auth/admin-login-redirect";
 
 import {
   buildConversionPayload,
@@ -59,7 +60,7 @@ export function InquiryConversionPanel({
     fallbackMessage: string,
   ) {
     if (response.status === 401 || response.status === 403) {
-      window.location.assign("/admin/login?next=/admin");
+      redirectToAdminLogin();
       return null;
     }
 

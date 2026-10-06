@@ -1,4 +1,5 @@
 import type { ApiResponse } from "@/shared/types/api";
+import { redirectToAdminLogin } from "../../../shared/lib/auth/admin-login-redirect";
 import {
   getInquiryQuotesQueryKey,
   sortInquiryQuotes,
@@ -17,7 +18,7 @@ export { getInquiryQuotesQueryKey };
 export async function fetchInquiryQuotes(inquiryId: string): Promise<{ quotes: InquiryQuoteSummary[] }> {
   const response = await fetch(`/api/admin/inquiries/${encodeURIComponent(inquiryId)}/quotes`, { headers: { Accept: "application/json" }, cache: "no-store" });
   if (response.status === 401 || response.status === 403) {
-    if (typeof window !== "undefined") window.location.assign("/admin/login?next=/admin");
+    if (typeof window !== "undefined") redirectToAdminLogin();
     throw new AdminInquiryQuotesError(response.status, "ADMIN_AUTH_REQUIRED", "관리자 인증이 만료되었습니다.");
   }
   const result = (await response.json().catch(() => null)) as ApiResponse<{ quotes: InquiryQuoteSummary[] }> | null;

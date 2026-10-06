@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { submitAdminLogin } from "../model/admin-login";
+import { getAdminLoginDestination } from "@/shared/lib/auth/admin-login-redirect";
 import { AdminLoginFormView } from "./admin-login-form-view";
 
 export function AdminLoginForm() {
@@ -27,6 +28,8 @@ export function AdminLoginForm() {
     const result = await submitAdminLogin(
       { email, password },
       (destination) => router.replace(destination),
+      fetch,
+      getAdminLoginDestination(window.location.search),
     );
 
     if (!result.ok) {

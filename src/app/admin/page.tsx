@@ -1,5 +1,5 @@
-import { AdminDashboard } from "@/widgets/admin-dashboard";
+import { AdminRouteOverview } from "@/widgets/admin-dashboard";
 
 export default function AdminDashboardPage() {
-  return <AdminDashboard />;
+  return <AdminRouteOverview />;
 }
