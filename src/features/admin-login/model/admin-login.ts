@@ -76,11 +76,12 @@ export async function submitAdminLogin(
   input: AdminLoginInput,
   navigate: (destination: string) => void,
   fetcher: AdminLoginFetcher = fetch,
+  destination = "/admin",
 ): Promise<AdminLoginResult> {
   const result = await requestAdminLogin(input, fetcher);
 
   if (result.ok) {
-    navigate("/admin");
+    navigate(destination);
   }
 
   return result;

@@ -28,7 +28,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       <div className="min-w-0 md:pl-20 xl:pl-72">
         <AdminMobileHeader title={title} menu={<AdminMobileDrawer pathname={pathname} />} />
         <main id="admin-main" tabIndex={-1} className="min-w-0 px-4 py-5 sm:px-6 md:px-8 md:py-8 xl:px-10">
-          <div className="mx-auto w-full max-w-[96rem]">{children}</div>
+          <div className="mx-auto w-full max-w-[96rem] text-[#17201a]">{children}</div>
         </main>
       </div>
     </div>

@@ -98,12 +98,36 @@ describe("admin theme model", () => {
               throw new Error("storage unavailable");
             },
           },
-          matchMedia() {
-            throw new Error("media unavailable");
+          matchMedia() { throw new Error("media unavailable"); },
+        },
+        document: {
+          documentElement: {
+            attributes: new Map<string, string>(),
+            setAttribute(name: string, value: string) {
+              this.attributes.set(name, value);
+            },
+            classList: { toggle() {} },
           },
         },
-        document: { documentElement: {} },
       }),
     );
+  });
+
+  test("applies a light fallback when storage and system media are unavailable", () => {
+    const attributes = new Map<string, string>();
+    runInNewContext(ADMIN_THEME_INIT_SCRIPT, {
+      window: {
+        location: { pathname: "/admin/projects" },
+        localStorage: { getItem() { throw new Error("blocked"); } },
+        matchMedia() { throw new Error("unsupported"); },
+      },
+      document: {
+        documentElement: {
+          setAttribute(name: string, value: string) { attributes.set(name, value); },
+          classList: { toggle() {} },
+        },
+      },
+    });
+    assert.equal(attributes.get("data-admin-theme"), "light");
   });
 });

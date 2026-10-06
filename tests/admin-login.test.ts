@@ -103,9 +103,10 @@ describe("admin login request", () => {
       { email: "admin@example.com", password: "secret-password" },
       (destination) => destinations.push(destination),
       fetcher,
+      "/admin/projects?status=in_progress",
     );
 
     assert.deepEqual(result, { ok: true });
-    assert.deepEqual(destinations, ["/admin"]);
+    assert.deepEqual(destinations, ["/admin/projects?status=in_progress"]);
   });
 });

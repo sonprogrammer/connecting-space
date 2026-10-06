@@ -26,16 +26,19 @@ export function getAdminThemeDomState(theme: ResolvedAdminTheme) {
 }
 
 export const ADMIN_THEME_INIT_SCRIPT = `(() => {
+  const pathname = window.location.pathname;
+  if (pathname !== "/admin" && !pathname.startsWith("/admin/")) return;
+  let preference = "system";
   try {
-    const pathname = window.location.pathname;
-    if (pathname !== "/admin" && !pathname.startsWith("/admin/")) return;
     const stored = window.localStorage.getItem("${ADMIN_THEME_STORAGE_KEY}");
-    const preference = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
-    const resolved = preference === "system"
-      ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-      : preference;
-    const root = document.documentElement;
-    root.setAttribute("data-admin-theme", resolved);
-    root.classList.toggle("dark", resolved === "dark");
+    if (stored === "light" || stored === "dark" || stored === "system") preference = stored;
   } catch (_) {}
+  let systemPrefersDark = false;
+  try {
+    systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  } catch (_) {}
+  const resolved = preference === "system" ? (systemPrefersDark ? "dark" : "light") : preference;
+  const root = document.documentElement;
+  root.setAttribute("data-admin-theme", resolved);
+  root.classList.toggle("dark", resolved === "dark");
 })();`;

@@ -91,7 +91,7 @@ export function AdminNavigationMenu({
 
 export function AdminSidebar({ pathname }: { pathname: string }) {
   return (
-    <aside className="fixed inset-y-0 left-0 z-20 hidden w-20 flex-col overflow-y-auto bg-[var(--admin-brand)] px-3 py-6 text-[var(--admin-brand-contrast)] md:flex xl:w-72 xl:px-5">
+    <aside className="fixed inset-y-0 left-0 z-20 hidden w-20 flex-col overflow-visible bg-[var(--admin-brand)] px-3 py-6 text-[var(--admin-brand-contrast)] md:flex xl:w-72 xl:px-5">
       <Link
         href="/admin"
         aria-label="Connecting Space 관리자 대시보드"

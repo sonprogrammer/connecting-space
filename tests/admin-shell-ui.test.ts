@@ -46,5 +46,19 @@ describe("admin shell UI", () => {
     assert.match(drawerSource, /Dialog\.Close/);
     assert.match(shellSource, /href="#admin-main"/);
     assert.match(shellSource, /<main[^>]*id="admin-main"/);
+    assert.match(shellSource, /max-w-\[96rem\] text-\[#17201a\]/);
+  });
+
+  test("keeps the theme and mobile navigation entry point reachable on tablet", () => {
+    const sidebarSource = readFileSync(
+      "src/widgets/admin-shell/ui/admin-sidebar.tsx",
+      "utf8",
+    );
+    const headerSource = readFileSync(
+      "src/widgets/admin-shell/ui/admin-mobile-header.tsx",
+      "utf8",
+    );
+    assert.match(sidebarSource, /overflow-visible/);
+    assert.match(headerSource, /xl:hidden/);
   });
 });

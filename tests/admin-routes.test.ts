@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 
-import { getAdminLoginHref } from "../src/shared/lib/auth/admin-login-redirect";
+import {
+  getAdminLoginDestination,
+  getAdminLoginHref,
+} from "../src/shared/lib/auth/admin-login-redirect";
 import { getLegacyInquiryRedirect } from "../src/widgets/admin-dashboard/model/admin-route-overview";
 
 describe("admin feature routes", () => {
@@ -39,5 +42,15 @@ describe("admin feature routes", () => {
     );
     assert.equal(getAdminLoginHref(), "/admin/login?next=%2Fadmin");
     assert.equal(getAdminLoginHref("/portfolio", "?draft=1"), "/admin/login?next=%2Fadmin");
+  });
+
+  test("restores only safe admin destinations after login", () => {
+    assert.equal(
+      getAdminLoginDestination("?next=%2Fadmin%2Fprojects%3Fstatus%3Din_progress"),
+      "/admin/projects?status=in_progress",
+    );
+    assert.equal(getAdminLoginDestination("?next=https%3A%2F%2Fevil.example"), "/admin");
+    assert.equal(getAdminLoginDestination("?next=%2F%2Fevil.example"), "/admin");
+    assert.equal(getAdminLoginDestination("?next=%2Fportfolio"), "/admin");
   });
 });
