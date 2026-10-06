@@ -26,12 +26,16 @@ import {
 } from "../model/admin-customer-project-queries";
 import { ProjectPaymentManager } from "./project-payment-manager";
 
-type Tab = "customers" | "projects";
+export type AdminCustomerProjectTab = "customers" | "projects";
 type DetailState<T> = { status: "idle" } | { status: "loading" } | { status: "success"; item: T; notice?: string; warning?: string; retry?: () => void } | { status: "error"; message: string };
 type LinkedState<T> = { status: "idle" } | { status: "loading" } | { status: "success"; item: T; warning?: string; retry?: () => void } | { status: "error"; message: string };
 
-export function AdminCustomerProjectManager() {
-  const [tab, setTab] = useState<Tab>("customers");
+export function AdminCustomerProjectManager({
+  initialTab = "customers",
+}: {
+  initialTab?: AdminCustomerProjectTab;
+}) {
+  const [tab, setTab] = useState<AdminCustomerProjectTab>(initialTab);
   const [customerQuery, setCustomerQuery] = useState("");
   const [projectQuery, setProjectQuery] = useState("");
   const [projectStatus, setProjectStatus] = useState<ProjectStatus | "">("");

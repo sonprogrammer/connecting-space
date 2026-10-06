@@ -27,6 +27,7 @@ import { InquiryReplyDraftPanel } from "@/features/manage-inquiry-reply";
 import { InquiryQuoteSummary } from "@/widgets/admin-inquiry-quotes";
 import { Button } from "@/shared/ui/button";
 import type { ApiResponse } from "@/shared/types/api";
+import { redirectToAdminLogin } from "@/shared/lib/auth/admin-login-redirect";
 import { InquirySelectionButton } from "./inquiry-selection-button";
 
 type InquiryListState =
@@ -67,7 +68,7 @@ export function AdminInquiryList() {
       });
 
       if (response.status === 401 || response.status === 403) {
-        window.location.assign("/admin/login?next=/admin");
+        redirectToAdminLogin();
         return;
       }
 
@@ -178,7 +179,7 @@ export function AdminInquiryList() {
         );
 
         if (response.status === 401 || response.status === 403) {
-          window.location.assign("/admin/login?next=/admin");
+          redirectToAdminLogin();
           return;
         }
 
@@ -457,7 +458,7 @@ function InquiryDetailForm({
       });
 
       if (response.status === 401 || response.status === 403) {
-        window.location.assign("/admin/login?next=/admin");
+        redirectToAdminLogin();
         return;
       }
 

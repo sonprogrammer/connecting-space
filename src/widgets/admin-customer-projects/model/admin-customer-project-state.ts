@@ -77,7 +77,7 @@ export function getInquiryDetailUrl(inquiryId: string) {
 }
 
 export function getInquiryAnchorHref(inquiryId: string) {
-  return `/admin#inquiry-${inquiryId}`;
+  return `/admin/inquiries#inquiry-${inquiryId}`;
 }
 
 export const emptyCustomerForm: CustomerFormValues = {
