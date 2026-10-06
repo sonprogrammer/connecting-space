@@ -31,13 +31,18 @@ export function AdminThemeProvider({ children }: { children: React.ReactNode }) 
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    const storedPreference = parseAdminThemePreference(
-      window.localStorage.getItem(ADMIN_THEME_STORAGE_KEY),
-    );
-    setPreferenceState(storedPreference);
-    setIsMounted(true);
+    let isActive = true;
+    queueMicrotask(() => {
+      if (!isActive) return;
+      const storedPreference = parseAdminThemePreference(
+        window.localStorage.getItem(ADMIN_THEME_STORAGE_KEY),
+      );
+      setPreferenceState(storedPreference);
+      setIsMounted(true);
+    });
 
     return () => {
+      isActive = false;
       const root = document.documentElement;
       root.removeAttribute("data-admin-theme");
       root.classList.remove("dark");
