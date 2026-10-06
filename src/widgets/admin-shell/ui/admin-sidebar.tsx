@@ -1,5 +1,6 @@
-import type { Ref } from "react";
+import { useState, type Ref } from "react";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import {
   FileText,
   FolderKanban,
@@ -33,6 +34,64 @@ type AdminNavigationMenuProps = {
   onNavigate?: () => void;
 };
 
+function AdminNavigationItem({
+  item,
+  active,
+  compact,
+  firstLinkRef,
+  onNavigate,
+}: {
+  item: (typeof adminNavigationGroups)[number]["items"][number];
+  active: boolean;
+  compact: boolean;
+  firstLinkRef?: Ref<HTMLAnchorElement>;
+  onNavigate?: () => void;
+}) {
+  const [tooltipPosition, setTooltipPosition] = useState<{ left: number; top: number } | null>(null);
+  const Icon = icons[item.icon];
+
+  function showTooltip(element: HTMLAnchorElement) {
+    if (compact) return;
+    const bounds = element.getBoundingClientRect();
+    setTooltipPosition({ left: bounds.right + 12, top: bounds.top + bounds.height / 2 });
+  }
+
+  return (
+    <>
+      <Link
+        ref={firstLinkRef}
+        href={item.href}
+        aria-current={active ? "page" : undefined}
+        aria-label={item.label}
+        title={!compact ? item.label : undefined}
+        onClick={onNavigate}
+        onMouseEnter={(event) => showTooltip(event.currentTarget)}
+        onMouseLeave={() => setTooltipPosition(null)}
+        onFocus={(event) => showTooltip(event.currentTarget)}
+        onBlur={() => setTooltipPosition(null)}
+        className={compact
+          ? "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[var(--admin-text)] outline-none transition-colors hover:bg-[var(--admin-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--admin-focus)] aria-[current=page]:bg-[var(--admin-brand)] aria-[current=page]:text-[var(--admin-brand-contrast)]"
+          : "group relative flex min-h-11 items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[var(--admin-brand-contrast)]/80 outline-none transition-colors hover:bg-white/10 hover:text-[var(--admin-brand-contrast)] focus-visible:ring-2 focus-visible:ring-[var(--admin-focus)] aria-[current=page]:bg-white/15 aria-[current=page]:text-[var(--admin-brand-contrast)] xl:justify-start"}
+      >
+        <Icon className="size-5 shrink-0" aria-hidden="true" />
+        <span className={compact ? undefined : "md:hidden xl:inline"}>{item.label}</span>
+      </Link>
+      {!compact && tooltipPosition && typeof document !== "undefined"
+        ? createPortal(
+            <span
+              role="tooltip"
+              className="pointer-events-none fixed z-[70] -translate-y-1/2 whitespace-nowrap rounded-lg bg-[var(--admin-text)] px-2.5 py-1.5 text-xs text-[var(--admin-surface)] shadow-lg xl:hidden"
+              style={tooltipPosition}
+            >
+              {item.label}
+            </span>,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
 export function AdminNavigationMenu({
   pathname,
   compact = false,
@@ -53,32 +112,17 @@ export function AdminNavigationMenu({
           </h2>
           <ul className="space-y-1">
             {group.items.map((item) => {
-              const Icon = icons[item.icon];
               const active = isAdminRouteActive(pathname, item.href);
               const currentIndex = linkIndex++;
               return (
                 <li key={item.id}>
-                  <Link
-                    ref={currentIndex === 0 ? firstLinkRef : undefined}
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    aria-label={item.label}
-                    onClick={onNavigate}
-                    className={compact
-                      ? "flex min-h-11 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[var(--admin-text)] outline-none transition-colors hover:bg-[var(--admin-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--admin-focus)] aria-[current=page]:bg-[var(--admin-brand)] aria-[current=page]:text-[var(--admin-brand-contrast)]"
-                      : "group relative flex min-h-11 items-center justify-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-[var(--admin-brand-contrast)]/80 outline-none transition-colors hover:bg-white/10 hover:text-[var(--admin-brand-contrast)] focus-visible:ring-2 focus-visible:ring-[var(--admin-focus)] aria-[current=page]:bg-white/15 aria-[current=page]:text-[var(--admin-brand-contrast)] xl:justify-start"}
-                  >
-                    <Icon className="size-5 shrink-0" aria-hidden="true" />
-                    <span className={compact ? undefined : "md:hidden xl:inline"}>{item.label}</span>
-                    {!compact ? (
-                      <span
-                        role="tooltip"
-                        className="pointer-events-none absolute left-[calc(100%+0.75rem)] z-30 hidden whitespace-nowrap rounded-lg bg-[var(--admin-text)] px-2.5 py-1.5 text-xs text-[var(--admin-surface)] shadow-lg group-hover:md:block group-focus-visible:md:block xl:hidden"
-                      >
-                        {item.label}
-                      </span>
-                    ) : null}
-                  </Link>
+                  <AdminNavigationItem
+                    item={item}
+                    active={active}
+                    compact={compact}
+                    firstLinkRef={currentIndex === 0 ? firstLinkRef : undefined}
+                    onNavigate={onNavigate}
+                  />
                 </li>
               );
             })}
@@ -91,7 +135,7 @@ export function AdminNavigationMenu({
 
 export function AdminSidebar({ pathname }: { pathname: string }) {
   return (
-    <aside className="fixed inset-y-0 left-0 z-20 hidden w-20 flex-col overflow-visible bg-[var(--admin-brand)] px-3 py-6 text-[var(--admin-brand-contrast)] md:flex xl:w-72 xl:px-5">
+    <aside className="fixed inset-y-0 left-0 z-20 hidden w-20 flex-col overflow-y-auto bg-[var(--admin-brand)] px-3 py-6 text-[var(--admin-brand-contrast)] md:flex xl:w-72 xl:px-5">
       <Link
         href="/admin"
         aria-label="Connecting Space 관리자 대시보드"

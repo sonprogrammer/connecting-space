@@ -29,7 +29,7 @@ export function AdminRouteOverview() {
   return (
     <section aria-labelledby="admin-overview-title">
       <LegacyInquiryHashRedirect />
-      <div className="rounded-2xl border border-[var(--admin-border)] bg-[var(--admin-surface)] p-6 sm:p-8">
+      <div className="rounded-2xl border border-[var(--admin-border)] bg-[var(--admin-surface)] p-6 text-[var(--admin-text)] sm:p-8">
         <p className="text-sm font-semibold text-[var(--admin-brand)]">Admin console</p>
         <h1 id="admin-overview-title" className="mt-2 text-2xl font-bold sm:text-3xl">
           관리자 대시보드

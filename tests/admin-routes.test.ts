@@ -49,6 +49,7 @@ describe("admin feature routes", () => {
       getAdminLoginDestination("?next=%2Fadmin%2Fprojects%3Fstatus%3Din_progress"),
       "/admin/projects?status=in_progress",
     );
+    assert.equal(getAdminLoginDestination("?next=%2Fadmin%3Ftab%3Dactivity"), "/admin?tab=activity");
     assert.equal(getAdminLoginDestination("?next=https%3A%2F%2Fevil.example"), "/admin");
     assert.equal(getAdminLoginDestination("?next=%2F%2Fevil.example"), "/admin");
     assert.equal(getAdminLoginDestination("?next=%2Fportfolio"), "/admin");

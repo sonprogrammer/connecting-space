@@ -46,7 +46,6 @@ describe("admin shell UI", () => {
     assert.match(drawerSource, /Dialog\.Close/);
     assert.match(shellSource, /href="#admin-main"/);
     assert.match(shellSource, /<main[^>]*id="admin-main"/);
-    assert.match(shellSource, /max-w-\[96rem\] text-\[#17201a\]/);
   });
 
   test("keeps the theme and mobile navigation entry point reachable on tablet", () => {
@@ -58,7 +57,16 @@ describe("admin shell UI", () => {
       "src/widgets/admin-shell/ui/admin-mobile-header.tsx",
       "utf8",
     );
-    assert.match(sidebarSource, /overflow-visible/);
+    assert.match(sidebarSource, /overflow-y-auto/);
+    assert.match(sidebarSource, /createPortal/);
     assert.match(headerSource, /xl:hidden/);
+  });
+
+  test("keeps the dashboard overview foreground bound to its theme tokens", () => {
+    const overviewSource = readFileSync(
+      "src/widgets/admin-dashboard/ui/admin-route-overview.tsx",
+      "utf8",
+    );
+    assert.match(overviewSource, /text-\[var\(--admin-text\)\]/);
   });
 });

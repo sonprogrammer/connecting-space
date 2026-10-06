@@ -64,10 +64,14 @@ export function AdminThemeProvider({ children }: { children: React.ReactNode }) 
     applyAdminTheme(preference);
     if (preference !== "system") return;
 
-    const mediaQuery = window.matchMedia(SYSTEM_THEME_QUERY);
-    const handleSystemThemeChange = () => applyAdminTheme("system");
-    mediaQuery.addEventListener("change", handleSystemThemeChange);
-    return () => mediaQuery.removeEventListener("change", handleSystemThemeChange);
+    try {
+      const mediaQuery = window.matchMedia(SYSTEM_THEME_QUERY);
+      const handleSystemThemeChange = () => applyAdminTheme("system");
+      mediaQuery.addEventListener("change", handleSystemThemeChange);
+      return () => mediaQuery.removeEventListener("change", handleSystemThemeChange);
+    } catch {
+      // Keep the already-applied fallback when system preference events are unavailable.
+    }
   }, [isMounted, preference]);
 
   const setPreference = (nextPreference: AdminThemePreference) => {
