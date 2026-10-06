@@ -60,6 +60,8 @@ describe("admin shell UI", () => {
     );
     assert.match(sidebarSource, /overflow-y-auto/);
     assert.match(sidebarSource, /createPortal/);
+    assert.match(sidebarSource, /addEventListener\("scroll", dismissTooltip, true\)/);
+    assert.match(sidebarSource, /addEventListener\("resize", dismissTooltip\)/);
     assert.match(headerSource, /xl:hidden/);
   });
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type Ref } from "react";
+import { useEffect, useState, type Ref } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import {
@@ -51,6 +51,17 @@ function AdminNavigationItem({
 }) {
   const [tooltipPosition, setTooltipPosition] = useState<{ left: number; top: number } | null>(null);
   const Icon = icons[item.icon];
+
+  useEffect(() => {
+    if (!tooltipPosition) return;
+    const dismissTooltip = () => setTooltipPosition(null);
+    window.addEventListener("scroll", dismissTooltip, true);
+    window.addEventListener("resize", dismissTooltip);
+    return () => {
+      window.removeEventListener("scroll", dismissTooltip, true);
+      window.removeEventListener("resize", dismissTooltip);
+    };
+  }, [tooltipPosition]);
 
   function showTooltip(element: HTMLAnchorElement) {
     if (compact) return;
