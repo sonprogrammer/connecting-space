@@ -51,6 +51,7 @@ export type Database = {
           admin_notes: string | null;
           converted_customer_id: string | null;
           converted_project_id: string | null;
+          qualified_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -71,6 +72,7 @@ export type Database = {
           admin_notes?: string | null;
           converted_customer_id?: string | null;
           converted_project_id?: string | null;
+          qualified_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -774,6 +776,15 @@ export type Database = {
       finalize_quote_expiration_alert: {
         Args: { p_alert_id: string; p_sent_at?: string };
         Returns: Database["public"]["Tables"]["quote_expiration_alerts"]["Row"];
+      };
+      get_admin_work_items: {
+        Args: {
+          p_page?: number;
+          p_page_size?: number;
+          p_group?: string;
+          p_now?: string;
+        };
+        Returns: Json;
       };
       fail_quote_expiration_alert: {
         Args: { p_alert_id: string; p_error_code: string; p_now?: string };
