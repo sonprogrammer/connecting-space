@@ -28,6 +28,7 @@ const baseInquiry: AdminInquiryDetail = {
   admin_notes: null,
   converted_customer_id: null,
   converted_project_id: null,
+  qualified_at: null,
   created_at: "2026-07-23T01:23:00.000Z",
   updated_at: "2026-07-23T01:23:00.000Z",
 };
