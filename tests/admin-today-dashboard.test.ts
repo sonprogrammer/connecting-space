@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
 import type { AdminInquiryListItem } from "../src/entities/inquiry";
-import { getTodayInquiryTasks } from "../src/widgets/admin-dashboard/model/admin-today-dashboard";
+import { getTodayInquiryTasks, todayDashboardActions } from "../src/widgets/admin-dashboard/model/admin-today-dashboard";
 
 const inquiries: AdminInquiryListItem[] = [
   {
@@ -52,6 +52,13 @@ describe("today dashboard inquiry tasks", () => {
     assert.deepEqual(
       getTodayInquiryTasks(inquiries, "newest").map(({ id }) => id),
       ["newest", "oldest"],
+    );
+  });
+
+  test("routes project conversion work to the existing inquiry conversion flow", () => {
+    assert.equal(
+      todayDashboardActions.find(({ id }) => id === "conversions")?.href,
+      "/admin/inquiries",
     );
   });
 });

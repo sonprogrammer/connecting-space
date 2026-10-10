@@ -10,7 +10,7 @@ import { formatAdminInquiryCreatedAt, getInquiryStatusLabel } from "@/entities/i
 import { adminNavigationGroups } from "@/widgets/admin-shell";
 import type { ApiResponse } from "@/shared/types/api";
 import { redirectToAdminLogin } from "@/shared/lib/auth/admin-login-redirect";
-import { getTodayInquiryTasks, type TodayInquirySort } from "../model/admin-today-dashboard";
+import { getTodayInquiryTasks, todayDashboardActions, type TodayInquirySort } from "../model/admin-today-dashboard";
 import { getLegacyInquiryRedirect } from "../model/admin-route-overview";
 
 export { getLegacyInquiryRedirect } from "../model/admin-route-overview";
@@ -19,37 +19,6 @@ type InquiryState =
   | { status: "loading" }
   | { status: "success"; inquiries: AdminInquiryListItem[] }
   | { status: "error"; message: string };
-
-const dashboardActions = [
-  {
-    id: "inquiries",
-    title: "신규 문의 답변",
-    description: "신규 문의의 첫 답변이 필요합니다.",
-    href: "/admin/inquiries",
-    available: true,
-  },
-  {
-    id: "quotes",
-    title: "견적 작성·발송",
-    description: "견적 전체를 조회하는 API가 아직 없습니다.",
-    href: "/admin/inquiries",
-    available: false,
-  },
-  {
-    id: "conversions",
-    title: "프로젝트 전환",
-    description: "전환 대상 견적을 조회하는 API가 아직 없습니다.",
-    href: "/admin/projects",
-    available: false,
-  },
-  {
-    id: "payments",
-    title: "연체 입금 확인",
-    description: "전체 입금과 연체를 조회하는 API가 아직 없습니다.",
-    href: "/admin/projects",
-    available: false,
-  },
-] as const;
 
 function LegacyInquiryHashRedirect() {
   const router = useRouter();
@@ -143,7 +112,7 @@ export function AdminRouteOverview() {
       </header>
 
       <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 xl:grid-cols-4" aria-label="업무 종류별 건수">
-        {dashboardActions.map((action) => (
+        {todayDashboardActions.map((action) => (
           <Link
             key={action.id}
             href={action.href}
