@@ -111,29 +111,42 @@ export function AdminRouteOverview() {
         </button>
       </header>
 
-      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 xl:grid-cols-4" aria-label="업무 종류별 건수">
-        {todayDashboardActions.map((action) => (
-          <Link
-            key={action.id}
-            href={action.href}
-            aria-label={`${action.title}, ${action.available ? state.status === "success" ? `${tasks.length}건` : "불러오는 중" : "건수 API 미제공"}. ${action.description} 기존 기능으로 이동`}
-            className="group min-w-0 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface)] p-4 text-[var(--admin-text)] outline-none transition-colors hover:bg-[var(--admin-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--admin-focus)] sm:p-5"
-          >
-            <span className="flex items-start justify-between gap-3">
-              <span className="text-sm font-semibold">{action.title}</span>
-              <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-[var(--admin-text-muted)] transition-transform group-hover:translate-x-1" />
-            </span>
-            <span className="mt-3 block text-3xl font-bold tabular-nums" aria-live={action.available ? "polite" : undefined}>
-              {action.available
-                ? state.status === "loading" ? <span className="text-base font-medium text-[var(--admin-text-muted)]">불러오는 중</span>
-                  : state.status === "error" ? "—" : tasks.length
-                : <span className="text-base font-semibold text-[var(--admin-text-muted)]">API 미제공</span>}
-            </span>
-            {!action.available ? <span className="mt-2 block text-xs leading-5 text-[var(--admin-text-muted)]">{action.description}</span> : null}
-            {action.available && state.status === "success" ? <span className="mt-2 block text-xs text-[var(--admin-text-muted)]">최근 문의 최대 100건 조회 결과</span> : null}
-            {action.available && state.status === "error" ? <span className="mt-2 block text-xs text-[var(--admin-text-muted)]">건수를 확인할 수 없습니다.</span> : null}
-          </Link>
-        ))}
+      <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 xl:grid-cols-4" role="group" aria-label="업무 종류별 건수">
+        {todayDashboardActions.map((action) => {
+          const cardClassName = "group block min-w-0 rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface)] p-4 text-[var(--admin-text)] sm:p-5";
+          const cardContent = (
+            <>
+              <span className="flex items-start justify-between gap-3">
+                <span className="text-sm font-semibold">{action.title}</span>
+                {action.href ? <ArrowRight aria-hidden="true" className="size-4 shrink-0 text-[var(--admin-text-muted)] transition-transform group-hover:translate-x-1" /> : null}
+              </span>
+              <span className="mt-3 block text-3xl font-bold tabular-nums" aria-live={action.available ? "polite" : undefined}>
+                {action.available
+                  ? state.status === "loading" ? <span className="text-base font-medium text-[var(--admin-text-muted)]">불러오는 중</span>
+                    : state.status === "error" ? "—" : tasks.length
+                  : <span className="text-base font-semibold text-[var(--admin-text-muted)]">API 미제공</span>}
+              </span>
+              {!action.available ? <span className="mt-2 block text-xs leading-5 text-[var(--admin-text-muted)]">{action.description}</span> : null}
+              {action.available && state.status === "success" ? <span className="mt-2 block text-xs text-[var(--admin-text-muted)]">최근 문의 최대 100건 조회 결과</span> : null}
+              {action.available && state.status === "error" ? <span className="mt-2 block text-xs text-[var(--admin-text-muted)]">건수를 확인할 수 없습니다.</span> : null}
+            </>
+          );
+
+          if (!action.href) {
+            return <article key={action.id} className={cardClassName}>{cardContent}</article>;
+          }
+
+          return (
+            <Link
+              key={action.id}
+              href={action.href}
+              aria-label={`${action.title}, ${state.status === "success" ? `${tasks.length}건` : state.status === "error" ? "건수 확인 불가" : "불러오는 중"}. ${action.description} 기존 기능으로 이동`}
+              className={`${cardClassName} outline-none transition-colors hover:bg-[var(--admin-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--admin-focus)]`}
+            >
+              {cardContent}
+            </Link>
+          );
+        })}
       </div>
 
       <section aria-labelledby="today-task-list-title" aria-busy={state.status === "loading"} className="overflow-hidden rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface)]">

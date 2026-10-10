@@ -55,10 +55,19 @@ describe("today dashboard inquiry tasks", () => {
     );
   });
 
-  test("routes project conversion work to the existing inquiry conversion flow", () => {
+  test("does not link the unavailable project-conversion count to the inquiry list", () => {
     assert.equal(
       todayDashboardActions.find(({ id }) => id === "conversions")?.href,
-      "/admin/inquiries",
+      null,
+    );
+  });
+
+  test("does not link to unrelated screens for action types without a listing API", () => {
+    assert.deepEqual(
+      todayDashboardActions
+        .filter(({ available }) => !available)
+        .map(({ href }) => href),
+      [null, null, null],
     );
   });
 });
