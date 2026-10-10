@@ -32,9 +32,8 @@ describe("로컬 관리자 오늘 할 일 PostgreSQL 통합", { skip: !enabled }
     });
 
     const inquiryIds: string[] = [];
+    const quoteInquiryIds: string[] = [];
     const quoteIds: string[] = [];
-    const versionIds: string[] = [];
-    const tokenIds: string[] = [];
     const projectIds: string[] = [];
     const customerIds: string[] = [];
     const paymentIds: string[] = [];
@@ -77,14 +76,13 @@ describe("로컬 관리자 오늘 할 일 PostgreSQL 통합", { skip: !enabled }
         const row = result.data?.[0];
         assert.ok(row?.created_quote_id && row.created_quote_version_id);
         quoteIds.push(row.created_quote_id);
-        versionIds.push(row.created_quote_version_id);
+        quoteInquiryIds.push(inquiryId);
         return { quoteId: row.created_quote_id, versionId: row.created_quote_version_id };
       };
 
       const conversionInquiryId = await createInquiry("qualified", "승인 전환 문의");
       const conversion = await createQuote(conversionInquiryId, "승인 전환 견적");
       const approvalTokenId = randomUUID();
-      tokenIds.push(approvalTokenId);
       assert.equal((await service.from("quote_approval_tokens").insert({
         id: approvalTokenId, quote_version_id: conversion.versionId, token_hash: randomHash(),
         expires_at: null, created_by: userId,
@@ -98,7 +96,7 @@ describe("로컬 관리자 오늘 할 일 PostgreSQL 통합", { skip: !enabled }
       const send = await createQuote(sendInquiryId, "발송 대상 견적");
       const queuedToken = randomUUID();
       const queuedDelivery = randomUUID();
-      tokenIds.push(queuedToken); deliveryIds.push(queuedDelivery);
+      deliveryIds.push(queuedDelivery);
       assert.equal((await service.from("quote_approval_tokens").insert({ id: queuedToken, quote_version_id: send.versionId, token_hash: randomHash(), expires_at: null, created_by: userId })).error, null);
       assert.equal((await service.from("quote_email_deliveries").insert({ id: queuedDelivery, quote_id: send.quoteId, quote_version_id: send.versionId, approval_token_id: queuedToken, generation: 1, encrypted_payload: "encrypted", payload_nonce: "nonce", payload_auth_tag: "tag", status: "queued" })).error, null);
 
@@ -106,7 +104,7 @@ describe("로컬 관리자 오늘 할 일 PostgreSQL 통합", { skip: !enabled }
       const retry = await createQuote(retryInquiryId, "재시도 견적");
       const failedToken = randomUUID();
       const failedDelivery = randomUUID();
-      tokenIds.push(failedToken); deliveryIds.push(failedDelivery);
+      deliveryIds.push(failedDelivery);
       assert.equal((await service.from("quote_approval_tokens").insert({ id: failedToken, quote_version_id: retry.versionId, token_hash: randomHash(), expires_at: null, created_by: userId })).error, null);
       assert.equal((await service.from("quote_email_deliveries").insert({ id: failedDelivery, quote_id: retry.quoteId, quote_version_id: retry.versionId, approval_token_id: failedToken, generation: 1, encrypted_payload: "encrypted", payload_nonce: "nonce", payload_auth_tag: "tag", status: "failed", attempt_count: 1, max_attempts: 3 })).error, null);
 
@@ -134,6 +132,18 @@ describe("로컬 관리자 오늘 할 일 PostgreSQL 통합", { skip: !enabled }
       assert.equal(payload.items.some((item) => item.deliveryStatus === "queued"), false);
       assert.equal(payload.items.some((item) => item.deliveryStatus === "failed"), true);
       assert.equal(payload.pagination.total, 6);
+      assert.equal(payload.items.every((item) => {
+        const link = item.deepLink;
+        return link === "/admin/projects" || (typeof link === "string" && link.startsWith("/admin/inquiries#inquiry-"));
+      }), true);
+
+      const [concurrentA, concurrentB] = await Promise.all([
+        admin.rpc("get_admin_work_items", { p_page: 1, p_page_size: 25, p_group: "all", p_now: fixedNow }),
+        admin.rpc("get_admin_work_items", { p_page: 1, p_page_size: 25, p_group: "all", p_now: fixedNow }),
+      ]);
+      assert.equal(concurrentA.error, null, concurrentA.error?.message);
+      assert.equal(concurrentB.error, null, concurrentB.error?.message);
+      assert.deepEqual(concurrentA.data, concurrentB.data);
 
       const page = await admin.rpc("get_admin_work_items", { p_page: 2, p_page_size: 2, p_group: "all", p_now: fixedNow });
       assert.equal(page.error, null, page.error?.message);
@@ -147,18 +157,53 @@ describe("로컬 관리자 오늘 할 일 PostgreSQL 통합", { skip: !enabled }
       assert.equal(denied.error?.code, "42501");
       assert.equal(newInquiryId.length, 36);
     } finally {
-      if (deliveryIds.length) await service.from("quote_email_deliveries").delete().in("id", deliveryIds);
-      if (tokenIds.length) await service.from("quote_approvals").delete().in("approval_token_id", tokenIds);
-      if (tokenIds.length) await service.from("quote_approval_tokens").delete().in("id", tokenIds);
-      if (paymentIds.length) await service.from("payment_receipts").delete().in("payment_id", paymentIds);
-      if (paymentIds.length) await service.from("payments").delete().in("id", paymentIds);
-      if (projectIds.length) await service.from("projects").delete().in("id", projectIds);
-      if (customerIds.length) await service.from("customers").delete().in("id", customerIds);
-      if (quoteIds.length) await service.from("quote_versions").delete().in("quote_id", quoteIds);
-      if (quoteIds.length) await service.from("quotes").delete().in("id", quoteIds);
-      if (inquiryIds.length) await service.from("inquiries").delete().in("id", inquiryIds);
-      await service.from("admins").delete().eq("id", userId);
-      await service.auth.admin.deleteUser(userId);
+      // quote_versions/quote_approvals are append-only by design. Neutralize their
+      // parent fixture rows and clear the marker so a second run sees no work.
+      if (deliveryIds.length) {
+        const result = await service.from("quote_email_deliveries").delete().in("id", deliveryIds).select("id");
+        assert.equal(result.error, null, result.error?.message);
+        assert.equal(result.data?.length, deliveryIds.length);
+      }
+      if (quoteIds.length) {
+        const result = await service.from("quotes").update({ status: "cancelled", latest_version_id: null, approved_version_id: null }).in("id", quoteIds).select("id");
+        assert.equal(result.error, null, result.error?.message);
+        assert.equal(result.data?.length, quoteIds.length);
+      }
+      if (inquiryIds.length) {
+        const result = await service.from("inquiries").update({ status: "closed", source: null, qualified_at: null }).in("id", inquiryIds).select("id");
+        assert.equal(result.error, null, result.error?.message);
+        assert.equal(result.data?.length, inquiryIds.length);
+      }
+      for (const inquiryId of inquiryIds.filter((id) => !quoteInquiryIds.includes(id))) {
+        const result = await service.from("inquiries").delete().eq("id", inquiryId).select("id");
+        assert.equal(result.error, null, result.error?.message);
+        assert.equal(result.data?.length, 1);
+      }
+      if (paymentIds.length) {
+        const receipts = await service.from("payment_receipts").delete().in("payment_id", paymentIds).select("id");
+        assert.equal(receipts.error, null, receipts.error?.message);
+        const payments = await service.from("payments").delete().in("id", paymentIds).select("id");
+        assert.equal(payments.error, null, payments.error?.message);
+        assert.equal(payments.data?.length, paymentIds.length);
+      }
+      if (projectIds.length) {
+        const result = await service.from("projects").delete().in("id", projectIds).select("id");
+        assert.equal(result.error, null, result.error?.message);
+        assert.equal(result.data?.length, projectIds.length);
+      }
+      if (customerIds.length) {
+        const result = await service.from("customers").delete().in("id", customerIds).select("id");
+        assert.equal(result.error, null, result.error?.message);
+        assert.equal(result.data?.length, customerIds.length);
+      }
+      const leftovers = await service.from("inquiries").select("id").eq("source", "integration_test");
+      assert.equal(leftovers.error, null, leftovers.error?.message);
+      assert.equal(leftovers.data?.length, 0);
+      const adminDelete = await service.from("admins").delete().eq("id", userId).select("id");
+      assert.equal(adminDelete.error, null, adminDelete.error?.message);
+      assert.equal(adminDelete.data?.length, 1);
+      const deletedUser = await service.auth.admin.deleteUser(userId);
+      assert.equal(deletedUser.error, null, deletedUser.error?.message);
     }
   });
 });

@@ -37,9 +37,9 @@ after(() => mock.restoreAll());
 describe("관리자 오늘 할 일 API", () => {
   test("인증된 요청의 query를 RPC에 전달하고 snapshot 계약을 반환한다", async () => {
     rpcArgs = undefined;
-    const response = await route.GET(new NextRequest("http://localhost/api/admin/work-items?page=2&pageSize=10&group=quote"));
+    const response = await route.GET(new NextRequest("http://localhost/api/admin/work-items?page=2&pageSize=10&group=quote&asOf=2026-10-10T00:00:00.000Z"));
     assert.equal(response.status, 200);
-    assert.deepEqual(rpcArgs, { p_page: 2, p_page_size: 10, p_group: "quote" });
+    assert.deepEqual(rpcArgs, { p_page: 2, p_page_size: 10, p_group: "quote", p_now: "2026-10-10T00:00:00.000Z" });
     assert.equal((await response.json()).data.pagination.pageSize, 25);
   });
 
@@ -47,5 +47,6 @@ describe("관리자 오늘 할 일 API", () => {
     assert.equal((await route.GET(new NextRequest("http://localhost/api/admin/work-items?page=0"))).status, 400);
     assert.equal((await route.GET(new NextRequest("http://localhost/api/admin/work-items?pageSize=101"))).status, 400);
     assert.equal((await route.GET(new NextRequest("http://localhost/api/admin/work-items?group=unknown"))).status, 400);
+    assert.equal((await route.GET(new NextRequest("http://localhost/api/admin/work-items?asOf=not-a-date"))).status, 400);
   });
 });

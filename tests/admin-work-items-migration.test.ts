@@ -24,5 +24,8 @@ describe("관리자 업무 집계 migration 계약", () => {
     assert.match(migration, /grant execute on function public\.get_admin_work_items[\s\S]+to authenticated/);
     assert.match(migration, /superseded_at is null/);
     assert.match(migration, /attempt_count/);
+    assert.match(migration, /\/admin\/inquiries#inquiry-/);
+    assert.match(migration, /'\/admin\/projects'::text/);
+    assert.doesNotMatch(migration, /\/admin\/(?:quotes|inquiries\/[^#']+\/quotes|projects\/[^']+\/payments)\//);
   });
 });
