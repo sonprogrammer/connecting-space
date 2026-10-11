@@ -1,73 +1,71 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 
-import type { AdminInquiryListItem } from "../src/entities/inquiry";
-import { getTodayInquiryTasks, todayDashboardActions } from "../src/widgets/admin-dashboard/model/admin-today-dashboard";
+import * as todayDashboardModel from "../src/widgets/admin-dashboard/model/admin-today-dashboard";
+import { adminWorkItemsResponseSchema, fetchAdminWorkItems, todayDashboardActions } from "../src/widgets/admin-dashboard/model/admin-today-dashboard";
 
-const inquiries: AdminInquiryListItem[] = [
-  {
-    id: "newest",
-    customer_name: "최근 문의",
-    email: null,
-    phone: null,
-    company_name: null,
-    service_type: "website",
-    status: "new",
-    created_at: "2026-10-10T10:00:00.000Z",
-    updated_at: "2026-10-10T10:00:00.000Z",
-  },
-  {
-    id: "contacted",
-    customer_name: "상담 중 문의",
-    email: null,
-    phone: null,
-    company_name: null,
-    service_type: "website",
-    status: "contacted",
-    created_at: "2026-10-10T08:00:00.000Z",
-    updated_at: "2026-10-10T08:00:00.000Z",
-  },
-  {
-    id: "oldest",
-    customer_name: "오래된 문의",
-    email: null,
-    phone: null,
-    company_name: null,
-    service_type: "website",
-    status: "new",
-    created_at: "2026-10-09T08:00:00.000Z",
-    updated_at: "2026-10-09T08:00:00.000Z",
-  },
-];
-
-describe("today dashboard inquiry tasks", () => {
-  test("includes only new inquiries and puts the longest-waiting first by default", () => {
+describe("today dashboard work item contract", () => {
+  test("shows all four API-backed groups as selectable actions", () => {
     assert.deepEqual(
-      getTodayInquiryTasks(inquiries, "oldest" ).map(({ id }) => id),
-      ["oldest", "newest"],
+      todayDashboardActions.map((action) => "group" in action ? action.group : null),
+      ["newInquiry", "quote", "projectConversion", "overduePayment"],
     );
+    assert.deepEqual(todayDashboardActions.map(({ countKey }) => countKey), [
+      "newInquiry", "quote", "projectConversion", "overduePayment",
+    ]);
   });
 
-  test("supports newest-first ordering without changing task eligibility", () => {
-    assert.deepEqual(
-      getTodayInquiryTasks(inquiries, "newest").map(({ id }) => id),
-      ["newest", "oldest"],
-    );
-  });
+  test("requests the selected group and stable API snapshot page", () => {
+    const buildUrl: unknown = Reflect.get(todayDashboardModel, "buildAdminWorkItemsUrl");
+    assert.equal(typeof buildUrl, "function");
+    if (typeof buildUrl !== "function") return;
 
-  test("does not link the unavailable project-conversion count to the inquiry list", () => {
     assert.equal(
-      todayDashboardActions.find(({ id }) => id === "conversions")?.href,
-      null,
+      buildUrl({
+        group: "quote",
+        page: 2,
+        pageSize: 10,
+        asOf: "2026-10-10T00:00:00.000Z",
+      }),
+      "/api/admin/work-items?page=2&pageSize=10&group=quote&asOf=2026-10-10T00%3A00%3A00.000Z",
     );
   });
 
-  test("does not link to unrelated screens for action types without a listing API", () => {
-    assert.deepEqual(
-      todayDashboardActions
-        .filter(({ available }) => !available)
-        .map(({ href }) => href),
-      [null, null, null],
-    );
+  test("validates API response without inventing or dropping contract fields", () => {
+    const parsed = adminWorkItemsResponseSchema.parse({
+      asOf: "2026-10-10T00:00:00.000Z",
+      counts: { total: 1, newInquiry: 1, quote: 0, projectConversion: 0, overduePayment: 0 },
+      pagination: { page: 1, pageSize: 25, total: 1, hasNextPage: false },
+      items: [{
+        id: "inquiry:123", group: "newInquiry", kind: "inquiry", priority: 20,
+        waitingSince: "2026-10-09T00:00:00.000Z", ageSeconds: 86400, waitingSinceFallback: false,
+        entityId: "123", inquiryId: "123", projectId: null, customerName: "고객",
+        title: "서비스 문의", status: "new", deliveryStatus: null, attemptCount: null,
+        maxAttempts: null, dueDate: null, action: "review_inquiry", deepLink: "/admin/inquiries#inquiry-123",
+      }],
+    });
+    assert.equal(parsed.items[0]?.action, "review_inquiry");
+    assert.equal(parsed.counts.total, parsed.pagination.total);
+  });
+
+  test("fetches the API with no-store and returns its exact snapshot contract", async () => {
+    let requestedUrl = "";
+    let requestedCache: RequestCache | undefined;
+    const payload = {
+      data: {
+        asOf: "2026-10-10T00:00:00.000Z",
+        counts: { total: 0, newInquiry: 0, quote: 0, projectConversion: 0, overduePayment: 0 },
+        pagination: { page: 1, pageSize: 25, total: 0, hasNextPage: false },
+        items: [],
+      },
+    };
+    const data = await fetchAdminWorkItems({ group: "all", page: 1, pageSize: 25 }, async (input, init) => {
+      requestedUrl = String(input);
+      requestedCache = init?.cache;
+      return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    assert.equal(requestedUrl, "/api/admin/work-items?page=1&pageSize=25&group=all");
+    assert.equal(requestedCache, "no-store");
+    assert.deepEqual(data, payload.data);
   });
 });
