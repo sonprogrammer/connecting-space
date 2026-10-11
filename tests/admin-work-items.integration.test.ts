@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { describe, test } from "node:test";
 import { createClient } from "@supabase/supabase-js";
@@ -32,7 +33,6 @@ describe("로컬 관리자 오늘 할 일 PostgreSQL 통합", { skip: !enabled }
     });
 
     const inquiryIds: string[] = [];
-    const quoteInquiryIds: string[] = [];
     const quoteIds: string[] = [];
     const projectIds: string[] = [];
     const customerIds: string[] = [];
@@ -76,7 +76,6 @@ describe("로컬 관리자 오늘 할 일 PostgreSQL 통합", { skip: !enabled }
         const row = result.data?.[0];
         assert.ok(row?.created_quote_id && row.created_quote_version_id);
         quoteIds.push(row.created_quote_id);
-        quoteInquiryIds.push(inquiryId);
         return { quoteId: row.created_quote_id, versionId: row.created_quote_version_id };
       };
 
@@ -174,11 +173,6 @@ describe("로컬 관리자 오늘 할 일 PostgreSQL 통합", { skip: !enabled }
         assert.equal(result.error, null, result.error?.message);
         assert.equal(result.data?.length, inquiryIds.length);
       }
-      for (const inquiryId of inquiryIds.filter((id) => !quoteInquiryIds.includes(id))) {
-        const result = await service.from("inquiries").delete().eq("id", inquiryId).select("id");
-        assert.equal(result.error, null, result.error?.message);
-        assert.equal(result.data?.length, 1);
-      }
       if (paymentIds.length) {
         const receipts = await service.from("payment_receipts").delete().in("payment_id", paymentIds).select("id");
         assert.equal(receipts.error, null, receipts.error?.message);
@@ -196,6 +190,43 @@ describe("로컬 관리자 오늘 할 일 PostgreSQL 통합", { skip: !enabled }
         assert.equal(result.error, null, result.error?.message);
         assert.equal(result.data?.length, customerIds.length);
       }
+      if (quoteIds.length) {
+        const sql = `do $$
+begin
+  execute 'alter table public.quote_approvals disable trigger prevent_quote_approval_mutation';
+  execute 'alter table public.quote_versions disable trigger prevent_quote_version_mutation';
+  delete from public.quote_approvals where quote_id in (${quoteIds.map(sqlLiteral).join(",")});
+  delete from public.quote_approval_tokens where quote_version_id in (select id from public.quote_versions where quote_id in (${quoteIds.map(sqlLiteral).join(",")}));
+  delete from public.quote_versions where quote_id in (${quoteIds.map(sqlLiteral).join(",")});
+  delete from public.quotes where id in (${quoteIds.map(sqlLiteral).join(",")});
+  delete from public.inquiries where id in (${inquiryIds.map(sqlLiteral).join(",")});
+  execute 'alter table public.quote_versions enable trigger prevent_quote_version_mutation';
+  execute 'alter table public.quote_approvals enable trigger prevent_quote_approval_mutation';
+end
+$$;`;
+        try {
+          execFileSync("supabase", ["db", "query", "--local", "--agent=no", sql], {
+            cwd: process.cwd(),
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"],
+          });
+        } catch (error) {
+          const detail = error instanceof Error ? error.message : String(error);
+          assert.fail(`local fixture SQL cleanup failed: ${detail}`);
+        }
+      } else {
+        for (const inquiryId of inquiryIds) {
+          const result = await service.from("inquiries").delete().eq("id", inquiryId).select("id");
+          assert.equal(result.error, null, result.error?.message);
+          assert.equal(result.data?.length, 1);
+        }
+      }
+      const remainingQuotes = await service.from("quotes").select("id").in("id", quoteIds);
+      assert.equal(remainingQuotes.error, null, remainingQuotes.error?.message);
+      assert.equal(remainingQuotes.data?.length, 0);
+      const remainingInquiries = await service.from("inquiries").select("id").in("id", inquiryIds);
+      assert.equal(remainingInquiries.error, null, remainingInquiries.error?.message);
+      assert.equal(remainingInquiries.data?.length, 0);
       const leftovers = await service.from("inquiries").select("id").eq("source", "integration_test");
       assert.equal(leftovers.error, null, leftovers.error?.message);
       assert.equal(leftovers.data?.length, 0);
@@ -210,4 +241,8 @@ describe("로컬 관리자 오늘 할 일 PostgreSQL 통합", { skip: !enabled }
 
 function randomHash() {
   return randomUUID().replaceAll("-", "").repeat(2);
+}
+
+function sqlLiteral(value: string) {
+  return `'${value.replaceAll("'", "''")}'`;
 }
