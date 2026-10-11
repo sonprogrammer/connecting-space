@@ -41,6 +41,45 @@ export const adminWorkItemsResponseSchema = z.object({
 export type AdminWorkItemsResponse = z.infer<typeof adminWorkItemsResponseSchema>;
 export type AdminWorkItem = AdminWorkItemsResponse["items"][number];
 
+export function appendAdminWorkItemsPage(
+  currentItems: AdminWorkItemsResponse["items"],
+  nextPage: AdminWorkItemsResponse,
+) {
+  return { data: nextPage, items: [...currentItems, ...nextPage.items] };
+}
+
+export function getWorkItemStatusLabel(item: Pick<AdminWorkItem, "group" | "status" | "action">) {
+  const inquiryStatuses: Record<string, string> = {
+    new: "신규",
+    contacted: "상담 중",
+    qualified: "검토 완료",
+    converted: "전환 완료",
+    closed: "종료",
+  };
+  const quoteStatuses: Record<string, string> = {
+    draft: "발송 대기",
+    queued: "발송 대기",
+    processing: "발송 중",
+    retry: "재시도 대기",
+    sent: "발송 완료",
+    failed: "발송 실패",
+    approved: "승인 완료",
+    expired: "만료",
+    cancelled: "취소",
+  };
+  const paymentStatuses: Record<string, string> = {
+    expected: "미입금",
+    overdue: "연체",
+    paid: "입금 완료",
+    cancelled: "취소",
+  };
+
+  if (item.group === "newInquiry") return inquiryStatuses[item.status] ?? item.status;
+  if (item.group === "quote") return item.action === "create_quote" ? "견적 작성 대기" : quoteStatuses[item.status] ?? item.status;
+  if (item.group === "projectConversion") return item.status === "approved" ? "승인 완료" : item.status;
+  return paymentStatuses[item.status] ?? item.status;
+}
+
 export const todayDashboardActions = [
   { group: "newInquiry", title: "신규 문의 답변", description: "첫 답변이 필요한 신규 문의", countKey: "newInquiry" },
   { group: "quote", title: "견적 작성·발송", description: "작성 또는 발송이 필요한 견적", countKey: "quote" },

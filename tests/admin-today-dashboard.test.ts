@@ -68,4 +68,48 @@ describe("today dashboard work item contract", () => {
     assert.equal(requestedCache, "no-store");
     assert.deepEqual(data, payload.data);
   });
+
+  test("advances pagination from the newest response and appends only its page", () => {
+    const appendPage = Reflect.get(todayDashboardModel, "appendAdminWorkItemsPage") as (
+      currentItems: ReturnType<typeof adminWorkItemsResponseSchema.parse>["items"],
+      nextPage: ReturnType<typeof adminWorkItemsResponseSchema.parse>,
+    ) => { data: ReturnType<typeof adminWorkItemsResponseSchema.parse>; items: ReturnType<typeof adminWorkItemsResponseSchema.parse>["items"] };
+    assert.equal(typeof appendPage, "function");
+    if (typeof appendPage !== "function") return;
+
+    const previous = adminWorkItemsResponseSchema.parse({
+      asOf: "2026-10-10T00:00:00.000Z",
+      counts: { total: 51, newInquiry: 51, quote: 0, projectConversion: 0, overduePayment: 0 },
+      pagination: { page: 1, pageSize: 25, total: 51, hasNextPage: true },
+      items: [makeInquiryItem("inquiry:1")],
+    });
+    const nextPage = adminWorkItemsResponseSchema.parse({
+      ...previous,
+      pagination: { page: 2, pageSize: 25, total: 51, hasNextPage: true },
+      items: [makeInquiryItem("inquiry:26")],
+    });
+    const merged = appendPage(previous.items, nextPage);
+    assert.equal(merged.data.pagination.page, 2);
+    assert.equal(merged.data.pagination.hasNextPage, true);
+    assert.deepEqual(merged.items.map(({ id }) => id), ["inquiry:1", "inquiry:26"]);
+    assert.match(todayDashboardModel.buildAdminWorkItemsUrl({ page: merged.data.pagination.page + 1 }), /page=3/);
+  });
+
+  test("labels the current work item status for the list row", () => {
+    const getStatusLabel: unknown = Reflect.get(todayDashboardModel, "getWorkItemStatusLabel");
+    assert.equal(typeof getStatusLabel, "function");
+    if (typeof getStatusLabel !== "function") return;
+    assert.equal(getStatusLabel({ group: "quote", kind: "quoteSend", status: "failed", action: "retry_quote" }), "발송 실패");
+    assert.equal(getStatusLabel({ group: "projectConversion", kind: "convertApprovedQuote", status: "approved", action: "convert_quote" }), "승인 완료");
+  });
 });
+
+function makeInquiryItem(id: string) {
+  return {
+    id, group: "newInquiry", kind: "inquiry", priority: 20,
+    waitingSince: "2026-10-09T00:00:00.000Z", ageSeconds: 86400, waitingSinceFallback: false,
+    entityId: id, inquiryId: id, projectId: null, customerName: "고객",
+    title: "서비스 문의", status: "new", deliveryStatus: null, attemptCount: null,
+    maxAttempts: null, dueDate: null, action: "review_inquiry", deepLink: `/admin/inquiries#${id}`,
+  } as const;
+}

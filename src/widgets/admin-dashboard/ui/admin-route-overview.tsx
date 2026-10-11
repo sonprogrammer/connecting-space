@@ -9,8 +9,10 @@ import { adminNavigationGroups } from "@/widgets/admin-shell";
 import { redirectToAdminLogin } from "@/shared/lib/auth/admin-login-redirect";
 import {
   fetchAdminWorkItems,
+  appendAdminWorkItemsPage,
   formatWorkItemAge,
   getWorkItemActionLabel,
+  getWorkItemStatusLabel,
   todayDashboardActions,
   type AdminWorkItem,
   type AdminWorkItemsResponse,
@@ -51,7 +53,7 @@ function WorkItemDialog({ item, onClose }: { item: AdminWorkItem | null; onClose
         </div>
         <dl className="mt-6 grid gap-4 rounded-xl bg-[var(--admin-surface-muted)] p-4 text-sm sm:grid-cols-2">
           <div><dt className="text-xs text-[var(--admin-text-muted)]">업무</dt><dd className="mt-1 font-semibold">{item.title}</dd></div>
-          <div><dt className="text-xs text-[var(--admin-text-muted)]">상태</dt><dd className="mt-1 font-semibold">{item.status}</dd></div>
+          <div><dt className="text-xs text-[var(--admin-text-muted)]">상태</dt><dd className="mt-1 font-semibold">{getWorkItemStatusLabel(item)}</dd></div>
           <div><dt className="text-xs text-[var(--admin-text-muted)]">대기 시간</dt><dd className="mt-1 font-semibold">{formatWorkItemAge(item.ageSeconds, item.group === "overduePayment")}</dd></div>
           {item.dueDate ? <div><dt className="text-xs text-[var(--admin-text-muted)]">기한</dt><dd className="mt-1 font-semibold">{item.dueDate}</dd></div> : null}
           {item.deliveryStatus ? <div><dt className="text-xs text-[var(--admin-text-muted)]">발송 상태</dt><dd className="mt-1 font-semibold">{item.deliveryStatus}</dd></div> : null}
@@ -82,7 +84,7 @@ export function AdminRouteOverview() {
       if (controller.signal.aborted) return;
       setState((current) => page === 1 || current.status !== "success"
         ? { status: "success", data, items: data.items, loadingMore: false }
-        : { status: "success", data: current.data, items: [...current.items, ...data.items], loadingMore: false });
+        : { status: "success", ...appendAdminWorkItemsPage(current.items, data), loadingMore: false });
     } catch (error) {
       if (controller.signal.aborted) return;
       if (error instanceof Error && "status" in error && (error.status === 401 || error.status === 403)) {
@@ -130,17 +132,18 @@ export function AdminRouteOverview() {
       <section aria-labelledby="today-task-list-title" aria-busy={state.status === "loading"} className="overflow-hidden rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface)]">
         <div className="border-b border-[var(--admin-border)] p-4 sm:px-5">
           <h2 id="today-task-list-title" className="text-lg font-bold text-[var(--admin-text)]">{group === "all" ? "우선 확인할 업무" : todayDashboardActions.find((item) => item.group === group)?.title}</h2>
-          <p className="mt-1 text-xs text-[var(--admin-text-muted)]">{state.status === "success" ? `전체 ${state.data.pagination.total.toLocaleString()}건 · 서버 우선순위순` : "업무 목록을 확인합니다."}</p>
+          <p className="mt-1 text-xs text-[var(--admin-text-muted)]">{state.status === "success" ? `${group === "all" ? "전체" : "필터 결과"} ${state.data.pagination.total.toLocaleString()}건 · 정렬: API 고정 우선순위순, 같은 우선순위 안에서는 오래 기다린순` : "업무 목록을 확인합니다."}</p>
         </div>
         {state.status === "loading" ? <div role="status" className="space-y-3 p-5 text-sm text-[var(--admin-text-muted)]"><span className="inline-flex items-center gap-2"><LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> 업무를 불러오는 중입니다.</span><div aria-hidden="true" className="h-16 animate-pulse rounded-lg bg-[var(--admin-surface-muted)]" /><div aria-hidden="true" className="h-16 animate-pulse rounded-lg bg-[var(--admin-surface-muted)]" /></div> : null}
         {state.status === "error" ? <div className="p-6 text-center" role="alert"><p className="text-sm text-[var(--admin-text)]">{state.message}</p><button type="button" onClick={() => void load(group)} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-lg bg-[var(--admin-brand)] px-4 text-sm font-semibold text-white outline-none focus-visible:ring-2 focus-visible:ring-[var(--admin-focus)]"><RefreshCw aria-hidden="true" className="size-4" /> 다시 시도</button></div> : null}
         {state.status === "success" && state.items.length === 0 ? <div className="p-8 text-center"><Inbox aria-hidden="true" className="mx-auto size-8 text-[var(--admin-text-muted)]" /><p className="mt-3 font-semibold text-[var(--admin-text)]">{state.data.counts.total === 0 ? "오늘 확인할 업무가 없습니다." : "선택한 업무가 없습니다."}</p><p className="mt-1 text-sm text-[var(--admin-text-muted)]">다른 업무 종류를 선택하거나 기존 관리자 메뉴에서 확인할 수 있습니다.</p></div> : null}
         {state.status === "success" && state.items.length > 0 ? <>
-          <div className="hidden grid-cols-[minmax(0,1fr)_minmax(8rem,0.7fr)_minmax(7rem,0.55fr)_auto] gap-4 bg-[var(--admin-surface-muted)] px-5 py-3 text-xs font-semibold text-[var(--admin-text-muted)] md:grid"><span>고객 / 업무</span><span>분류</span><span>대기 시간</span><span>다음 행동</span></div>
-          <ul className="divide-y divide-[var(--admin-border)]">{state.items.map((item) => <li key={item.id}><button type="button" onClick={() => setSelectedItem(item)} className="grid w-full gap-2 px-4 py-4 text-left outline-none transition-colors hover:bg-[var(--admin-surface-muted)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--admin-focus)] md:grid-cols-[minmax(0,1fr)_minmax(8rem,0.7fr)_minmax(7rem,0.55fr)_auto] md:items-center md:gap-4 md:px-5">
+          <div className="hidden grid-cols-[minmax(0,1fr)_minmax(8rem,0.7fr)_minmax(7rem,0.55fr)_minmax(7rem,0.55fr)_auto] gap-4 bg-[var(--admin-surface-muted)] px-5 py-3 text-xs font-semibold text-[var(--admin-text-muted)] lg:grid"><span>고객 / 업무</span><span>분류</span><span>현재 상태</span><span>대기 시간</span><span>다음 행동</span></div>
+          <ul className="divide-y divide-[var(--admin-border)]">{state.items.map((item) => <li key={item.id}><button type="button" onClick={() => setSelectedItem(item)} className="grid w-full gap-2 px-4 py-4 text-left outline-none transition-colors hover:bg-[var(--admin-surface-muted)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--admin-focus)] lg:grid-cols-[minmax(0,1fr)_minmax(8rem,0.7fr)_minmax(7rem,0.55fr)_minmax(7rem,0.55fr)_auto] lg:items-center lg:gap-4 lg:px-5">
             <span className="min-w-0"><span className="block truncate font-semibold text-[var(--admin-text)]">{item.customerName}</span><span className="mt-1 block truncate text-xs text-[var(--admin-text-muted)]">{item.title}</span></span>
-            <span className="flex items-center justify-between gap-2 text-sm text-[var(--admin-text)] md:block"><span className="md:hidden text-xs text-[var(--admin-text-muted)]">업무 종류</span>{todayDashboardActions.find((action) => action.group === item.group)?.title}</span>
-            <span className="flex items-center justify-between gap-2 text-sm text-[var(--admin-text-muted)] md:block"><span className="md:hidden text-xs">대기</span>{formatWorkItemAge(item.ageSeconds, item.group === "overduePayment")}</span>
+            <span className="flex items-center justify-between gap-2 text-sm text-[var(--admin-text)] lg:block"><span className="text-xs text-[var(--admin-text-muted)] lg:hidden">업무 종류</span>{todayDashboardActions.find((action) => action.group === item.group)?.title}</span>
+            <span className="flex items-center justify-between gap-2 text-sm font-medium text-[var(--admin-text)] lg:block"><span className="text-xs text-[var(--admin-text-muted)] lg:hidden">현재 상태</span>{getWorkItemStatusLabel(item)}</span>
+            <span className="flex items-center justify-between gap-2 text-sm text-[var(--admin-text-muted)] lg:block"><span className="text-xs lg:hidden">대기</span>{formatWorkItemAge(item.ageSeconds, item.group === "overduePayment")}</span>
             <span className="justify-self-end text-sm font-semibold text-[var(--admin-brand)]">{getWorkItemActionLabel(item.action)} <span aria-hidden="true">→</span></span>
           </button></li>)}</ul>
           {state.data.pagination.hasNextPage ? <div className="border-t border-[var(--admin-border)] p-4 text-center"><button type="button" disabled={state.loadingMore} onClick={() => void load(group, state.data.pagination.page + 1, state.data.asOf)} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[var(--admin-border)] px-4 text-sm font-semibold text-[var(--admin-text)] outline-none hover:bg-[var(--admin-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--admin-focus)] disabled:opacity-60">{state.loadingMore ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : null}더 불러오기</button></div> : null}
