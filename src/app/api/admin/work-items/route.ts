@@ -9,6 +9,7 @@ const workItemsQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
   group: z.enum(["all", "newInquiry", "quote", "projectConversion", "overduePayment"]).default("all"),
   asOf: z.string().datetime({ offset: true }).optional(),
+  sort: z.enum(["waiting", "latest"]).optional(),
 });
 
 export async function GET(request: NextRequest) {
@@ -22,6 +23,7 @@ export async function GET(request: NextRequest) {
     pageSize: request.nextUrl.searchParams.get("pageSize") ?? undefined,
     group: request.nextUrl.searchParams.get("group") ?? undefined,
     asOf: request.nextUrl.searchParams.get("asOf") ?? undefined,
+    sort: request.nextUrl.searchParams.get("sort") ?? undefined,
   });
   if (!parsed.success) {
     return jsonError("VALIDATION_ERROR", "Invalid work items query", 400, parsed.error.flatten());
@@ -31,6 +33,7 @@ export async function GET(request: NextRequest) {
     p_page: parsed.data.page,
     p_page_size: parsed.data.pageSize,
     p_group: parsed.data.group,
+    p_sort: parsed.data.sort ?? (parsed.data.group === "all" ? "waiting" : "latest"),
     ...(parsed.data.asOf ? { p_now: parsed.data.asOf } : {}),
   });
   if (error || !data) {
