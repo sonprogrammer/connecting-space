@@ -19,6 +19,8 @@ before(() => {
         return {
           data: {
             asOf: "2026-10-10T00:00:00.000Z",
+            group: "all",
+            sort: "waiting",
             counts: { total: 1, newInquiry: 1, quote: 0, projectConversion: 0, overduePayment: 0 },
             pagination: { page: 1, pageSize: 25, total: 1, hasNextPage: false },
             items: [],
@@ -39,7 +41,7 @@ describe("관리자 오늘 할 일 API", () => {
     rpcArgs = undefined;
     const response = await route.GET(new NextRequest("http://localhost/api/admin/work-items?page=2&pageSize=10&group=quote&asOf=2026-10-10T00:00:00.000Z"));
     assert.equal(response.status, 200);
-    assert.deepEqual(rpcArgs, { p_page: 2, p_page_size: 10, p_group: "quote", p_now: "2026-10-10T00:00:00.000Z" });
+    assert.deepEqual(rpcArgs, { p_page: 2, p_page_size: 10, p_group: "quote", p_now: "2026-10-10T00:00:00.000Z", p_sort: "latest" });
     assert.equal((await response.json()).data.pagination.pageSize, 25);
   });
 
@@ -48,5 +50,13 @@ describe("관리자 오늘 할 일 API", () => {
     assert.equal((await route.GET(new NextRequest("http://localhost/api/admin/work-items?pageSize=101"))).status, 400);
     assert.equal((await route.GET(new NextRequest("http://localhost/api/admin/work-items?group=unknown"))).status, 400);
     assert.equal((await route.GET(new NextRequest("http://localhost/api/admin/work-items?asOf=not-a-date"))).status, 400);
+    assert.equal((await route.GET(new NextRequest("http://localhost/api/admin/work-items?sort=unknown"))).status, 400);
+  });
+
+  test("전체 목록은 오래 기다린순, 명시한 sort는 그대로 RPC에 전달한다", async () => {
+    await route.GET(new NextRequest("http://localhost/api/admin/work-items"));
+    assert.equal(rpcArgs?.p_sort, "waiting");
+    await route.GET(new NextRequest("http://localhost/api/admin/work-items?sort=latest"));
+    assert.equal(rpcArgs?.p_sort, "latest");
   });
 });

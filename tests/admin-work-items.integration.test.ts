@@ -118,7 +118,7 @@ describe("로컬 관리자 오늘 할 일 PostgreSQL 통합", { skip: !enabled }
       paymentIds.push(payment.data.id);
       assert.equal((await service.from("payment_receipts").insert({ payment_id: payment.data.id, amount: 300000, idempotency_key: randomUUID() })).error, null);
 
-      const all = await admin.rpc("get_admin_work_items", { p_page: 1, p_page_size: 25, p_group: "all", p_now: fixedNow });
+      const all = await admin.rpc("get_admin_work_items", { p_page: 1, p_page_size: 25, p_group: "all", p_now: fixedNow, p_sort: "waiting" });
       assert.equal(all.error, null, all.error?.message);
       const payload = all.data as { counts: Record<string, number>; items: Array<Record<string, unknown>>; pagination: { total: number } };
       assert.equal(payload.counts.newInquiry, 1);
@@ -131,28 +131,56 @@ describe("로컬 관리자 오늘 할 일 PostgreSQL 통합", { skip: !enabled }
       assert.equal(payload.items.some((item) => item.deliveryStatus === "queued"), false);
       assert.equal(payload.items.some((item) => item.deliveryStatus === "failed"), true);
       assert.equal(payload.pagination.total, 6);
+      assert.equal((all.data as { group: string; sort: string }).group, "all");
+      assert.equal((all.data as { group: string; sort: string }).sort, "waiting");
       assert.equal(payload.items.every((item) => {
         const link = item.deepLink;
         return link === "/admin/projects" || (typeof link === "string" && link.startsWith("/admin/inquiries#inquiry-"));
       }), true);
 
       const [concurrentA, concurrentB] = await Promise.all([
-        admin.rpc("get_admin_work_items", { p_page: 1, p_page_size: 25, p_group: "all", p_now: fixedNow }),
-        admin.rpc("get_admin_work_items", { p_page: 1, p_page_size: 25, p_group: "all", p_now: fixedNow }),
+        admin.rpc("get_admin_work_items", { p_page: 1, p_page_size: 25, p_group: "all", p_now: fixedNow, p_sort: "waiting" }),
+        admin.rpc("get_admin_work_items", { p_page: 1, p_page_size: 25, p_group: "all", p_now: fixedNow, p_sort: "waiting" }),
       ]);
       assert.equal(concurrentA.error, null, concurrentA.error?.message);
       assert.equal(concurrentB.error, null, concurrentB.error?.message);
       assert.deepEqual(concurrentA.data, concurrentB.data);
 
-      const page = await admin.rpc("get_admin_work_items", { p_page: 2, p_page_size: 2, p_group: "all", p_now: fixedNow });
+      const page = await admin.rpc("get_admin_work_items", { p_page: 2, p_page_size: 2, p_group: "all", p_now: fixedNow, p_sort: "waiting" });
       assert.equal(page.error, null, page.error?.message);
       const pagePayload = page.data as { items: unknown[]; pagination: { total: number; hasNextPage: boolean } };
       assert.equal(pagePayload.items.length, 2);
       assert.equal(pagePayload.pagination.total, 6);
       assert.equal(pagePayload.pagination.hasNextPage, true);
 
+      const quoteGroup = await admin.rpc("get_admin_work_items", {
+        p_page: 1, p_page_size: 25, p_group: "quote", p_now: fixedNow, p_sort: "latest",
+      });
+      assert.equal(quoteGroup.error, null, quoteGroup.error?.message);
+      const quotePayload = quoteGroup.data as {
+        group: string; sort: string; counts: Record<string, number>;
+        pagination: { total: number }; items: Array<Record<string, unknown> & { kind: string }>;
+      };
+      assert.equal(quotePayload.group, "quote");
+      assert.equal(quotePayload.sort, "latest");
+      assert.equal(quotePayload.pagination.total, 3);
+      assert.equal(quotePayload.counts.total, 6);
+      assert.equal(quotePayload.counts.newInquiry, 1);
+      const draft = quotePayload.items.find((item) => item.kind === "quoteDraft");
+      assert.ok(draft);
+      assert.equal(draft.latestAt, draft.waitingSince);
+
+      const quoteWaiting = await admin.rpc("get_admin_work_items", {
+        p_page: 1, p_page_size: 25, p_group: "quote", p_now: fixedNow, p_sort: "waiting",
+      });
+      assert.equal(quoteWaiting.error, null, quoteWaiting.error?.message);
+      const waitingDraftIds = (quoteWaiting.data as { items: Array<{ id: string; kind: string }> }).items
+        .filter((item) => item.kind === "quoteDraft").map((item) => item.id);
+      const latestDraftIds = quotePayload.items.filter((item) => item.kind === "quoteDraft").map((item) => item.id);
+      assert.notDeepEqual(latestDraftIds, waitingDraftIds);
+
       const nonAdmin = createClient<Database>(url, anonKey, { auth: { persistSession: false } });
-      const denied = await nonAdmin.rpc("get_admin_work_items", { p_page: 1, p_page_size: 25, p_group: "all", p_now: fixedNow });
+      const denied = await nonAdmin.rpc("get_admin_work_items", { p_page: 1, p_page_size: 25, p_group: "all", p_now: fixedNow, p_sort: "waiting" });
       assert.equal(denied.error?.code, "42501");
       assert.equal(newInquiryId.length, 36);
     } finally {

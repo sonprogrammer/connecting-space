@@ -783,6 +783,7 @@ export type Database = {
           p_page_size?: number;
           p_group?: string;
           p_now?: string;
+          p_sort?: string;
         };
         Returns: Json;
       };
