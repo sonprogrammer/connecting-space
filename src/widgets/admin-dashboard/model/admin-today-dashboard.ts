@@ -2,6 +2,9 @@ import { z } from "zod";
 
 export const workItemGroups = ["all", "newInquiry", "quote", "projectConversion", "overduePayment"] as const;
 export type WorkItemGroup = (typeof workItemGroups)[number];
+export const workItemSorts = ["waiting", "latest"] as const;
+export type WorkItemSort = (typeof workItemSorts)[number];
+export const ADMIN_WORK_ITEMS_PAGE_SIZE = 25;
 
 const workItemSchema = z.object({
   id: z.string(),
@@ -9,6 +12,7 @@ const workItemSchema = z.object({
   kind: z.string(),
   priority: z.number(),
   waitingSince: z.string(),
+  latestAt: z.string(),
   ageSeconds: z.number(),
   waitingSinceFallback: z.boolean(),
   entityId: z.string(),
@@ -27,6 +31,8 @@ const workItemSchema = z.object({
 
 export const adminWorkItemsResponseSchema = z.object({
   asOf: z.string(),
+  group: z.enum(workItemGroups),
+  sort: z.enum(workItemSorts),
   counts: z.object({
     total: z.number(),
     newInquiry: z.number(),
@@ -80,6 +86,14 @@ export function getWorkItemStatusLabel(item: Pick<AdminWorkItem, "group" | "stat
   return paymentStatuses[item.status] ?? item.status;
 }
 
+export function getDefaultWorkItemsSort(group: WorkItemGroup): WorkItemSort {
+  return group === "all" ? "waiting" : "latest";
+}
+
+export function getWorkItemsSortChangeQuery(group: WorkItemGroup, sort: WorkItemSort) {
+  return { group, sort, page: 1, pageSize: ADMIN_WORK_ITEMS_PAGE_SIZE };
+}
+
 export const todayDashboardActions = [
   { group: "newInquiry", title: "신규 문의 답변", description: "첫 답변이 필요한 신규 문의", countKey: "newInquiry" },
   { group: "quote", title: "견적 작성·발송", description: "작성 또는 발송이 필요한 견적", countKey: "quote" },
@@ -87,13 +101,14 @@ export const todayDashboardActions = [
   { group: "overduePayment", title: "연체 입금 확인", description: "기한이 지나 확인이 필요한 입금", countKey: "overduePayment" },
 ] as const satisfies readonly { group: Exclude<WorkItemGroup, "all">; title: string; description: string; countKey: keyof AdminWorkItemsResponse["counts"] }[];
 
-export function buildAdminWorkItemsUrl({ group = "all", page = 1, pageSize = 25, asOf }: {
+export function buildAdminWorkItemsUrl({ group = "all", sort = getDefaultWorkItemsSort(group), page = 1, pageSize = ADMIN_WORK_ITEMS_PAGE_SIZE, asOf }: {
   group?: WorkItemGroup;
+  sort?: WorkItemSort;
   page?: number;
   pageSize?: number;
   asOf?: string;
 }) {
-  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), group });
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize), group, sort });
   if (asOf) params.set("asOf", asOf);
   return `/api/admin/work-items?${params.toString()}`;
 }
