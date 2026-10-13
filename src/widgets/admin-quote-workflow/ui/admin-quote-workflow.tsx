@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, Download, FilePlus2, Loader2, RefreshCw, Send, ShieldCheck } from "lucide-react";
 
 import type { AdminInquiryDetail } from "@/entities/inquiry";
+import { resetAdminWorkItemsCache } from "@/entities/admin-work-item/model/reset-query-cache";
 import type { ConfirmQuoteContractInput, QuoteVersionRow } from "@/entities/quote";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
@@ -66,6 +67,7 @@ export function AdminQuoteWorkflow() {
     mutationFn: createAdminInquiry,
     onSuccess: async (created) => {
       await queryClient.invalidateQueries({ queryKey: adminQuoteKeys.inquiries });
+      await resetAdminWorkItemsCache(queryClient);
       setSelectedInquiryId(created.id);
       setDirectInquiryOpen(false);
       setNotice("직접 등록한 문의를 선택했습니다. 견적을 작성해 주세요.");
@@ -75,6 +77,7 @@ export function AdminQuoteWorkflow() {
   const createQuoteMutation = useMutation({
     mutationFn: createQuote,
     onSuccess: (created) => {
+      void resetAdminWorkItemsCache(queryClient);
       setQuoteId(created.quoteId);
       setNotice("견적과 1차 버전을 저장했습니다.");
       setError(null);
@@ -85,6 +88,7 @@ export function AdminQuoteWorkflow() {
     mutationFn: ({ id, payload }: { id: string; payload: ReturnType<typeof toQuoteSnapshotPayload> }) => createQuoteVersion(id, payload),
     onSuccess: async (created) => {
       await queryClient.invalidateQueries({ queryKey: adminQuoteKeys.quote(quoteId) });
+      await resetAdminWorkItemsCache(queryClient);
       setNotice(`${created.versionNumber}차 버전을 저장했습니다.`);
       setError(null);
     },
@@ -94,6 +98,7 @@ export function AdminQuoteWorkflow() {
     mutationFn: sendQuoteEmail,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: adminQuoteKeys.quote(quoteId) });
+      await resetAdminWorkItemsCache(queryClient);
       setNotice("자동 이메일 발송 작업을 등록했습니다.");
       setError(null);
     },
@@ -103,6 +108,7 @@ export function AdminQuoteWorkflow() {
     mutationFn: retryQuoteEmail,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: adminQuoteKeys.quote(quoteId) });
+      await resetAdminWorkItemsCache(queryClient);
       setNotice("발송 재시도를 등록했습니다.");
       setError(null);
     },
@@ -118,6 +124,7 @@ export function AdminQuoteWorkflow() {
       anchor.click();
       URL.revokeObjectURL(url);
       await queryClient.invalidateQueries({ queryKey: adminQuoteKeys.quote(quoteId) });
+      await resetAdminWorkItemsCache(queryClient);
       setNotice(`수동 PDF를 발급하고 다운로드했습니다. 만료: ${formatDateTime(expiresAt)}`);
       setError(null);
     },
@@ -127,6 +134,7 @@ export function AdminQuoteWorkflow() {
     mutationFn: ({ id, payload }: { id: string; payload: ConfirmQuoteContractInput }) => confirmQuoteContract(id, payload),
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: adminQuoteKeys.quote(quoteId) });
+      await resetAdminWorkItemsCache(queryClient);
       setNotice(`계약 확인과 프로젝트 생성을 완료했습니다. 프로젝트 ID: ${result.projectId}`);
       setError(null);
     },

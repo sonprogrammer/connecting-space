@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { infiniteQueryOptions } from "@tanstack/react-query";
+import { adminWorkItemsQueryKeys } from "../../../entities/admin-work-item/model/query-keys";
+export { adminWorkItemsQueryKeys } from "../../../entities/admin-work-item/model/query-keys";
 
 export const workItemGroups = ["all", "newInquiry", "quote", "projectConversion", "overduePayment"] as const;
 export type WorkItemGroup = (typeof workItemGroups)[number];
@@ -48,12 +50,6 @@ export const adminWorkItemsResponseSchema = z.object({
 export type AdminWorkItemsResponse = z.infer<typeof adminWorkItemsResponseSchema>;
 export type AdminWorkItem = AdminWorkItemsResponse["items"][number];
 export type AdminWorkItemsPageParam = { page: number; asOf?: string };
-
-export const adminWorkItemsQueryKeys = {
-  all: ["admin", "work-items"] as const,
-  list: ({ group, sort, pageSize }: { group: WorkItemGroup; sort: WorkItemSort; pageSize: number }) =>
-    [...adminWorkItemsQueryKeys.all, "list", { group, sort, pageSize }] as const,
-};
 
 export function adminWorkItemsInfiniteQueryOptions(
   query: { group: WorkItemGroup; sort: WorkItemSort; pageSize: number },

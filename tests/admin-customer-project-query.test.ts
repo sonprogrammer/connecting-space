@@ -8,7 +8,7 @@ import {
   parseAdminQueryResponse,
   type AdminQueryError,
 } from "../src/widgets/admin-customer-projects/model/admin-customer-project-queries";
-import { applyAdminSearch, chooseRetry, getAdminQueryWarning, getCachedQueryWarning } from "../src/widgets/admin-customer-projects/model/admin-customer-project-state";
+import { applyAdminSearch, chooseRetry, getAdminQueryWarning, getCachedQueryWarning, toCustomerListState } from "../src/widgets/admin-customer-projects/model/admin-customer-project-state";
 
 describe("admin customer/project query model", () => {
   test("keeps list keys separate for every pagination and filter value", () => {
@@ -77,6 +77,16 @@ describe("admin customer/project query model", () => {
     assert.match(source, /function ProjectEditor\([^\n]*onDetailRetry[^\n]*onLinkedCustomerRetry/);
     assert.match(source, /<ProjectEditor detail=\{detail\} onDetailRetry=\{onDetailRetry\}[^\n]*onLinkedCustomerRetry=\{onLinkedCustomerRetry\}/);
     assert.doesNotMatch(source, /queryRetryRegistry/);
+  });
+
+  test("keeps the current page count separate from the API total", () => {
+    const items = Array.from({ length: 25 }, (_, index) => ({ id: `item-${index}` }));
+    const state = toCustomerListState({ data: { items: items as never, page: 2, totalPages: 3, total: 51 } });
+    assert.equal(state.status, "success");
+    if (state.status === "success") {
+      assert.equal(state.items.length, 25);
+      assert.equal(state.total, 51);
+    }
   });
 
   test("opens the route-requested customer or project tab", () => {

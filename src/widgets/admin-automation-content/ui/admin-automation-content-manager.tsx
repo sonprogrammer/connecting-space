@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, BookOpenText, CheckCircle2, FilePlus2, Loader2, RefreshCw, Save, Settings2 } from "lucide-react";
 
 import type { AdminFaqItem, AdminServiceOffering } from "@/entities/automation";
@@ -12,6 +13,7 @@ import {
 import type { ApiResponse } from "@/shared/types/api";
 import { AdminLoginLink } from "@/shared/ui/admin-login-link";
 import { Button } from "@/shared/ui/button";
+import { adminAutomationContentQueryKeys, fetchAdminFaqs, fetchAdminServices } from "../model/admin-automation-content-queries";
 
 type LoadState<T> = { status: "loading" } | { status: "success"; items: T[] } | { status: "error"; message: string };
 type EditorMode = { type: "create" } | { type: "edit"; id: string };
@@ -41,30 +43,18 @@ function Tab({ active, onClick, onKeyDown, id, controls, children }: Readonly<{ 
 }
 
 function ServiceManager() {
-  const [state, setState] = useState<LoadState<AdminServiceOffering>>({ status: "loading" });
+  const queryClient = useQueryClient();
+  const servicesQuery = useQuery({ queryKey: adminAutomationContentQueryKeys.services.list(), queryFn: ({ signal }) => fetchAdminServices({ signal }) });
+  const state: LoadState<AdminServiceOffering> = servicesQuery.isPending && !servicesQuery.data ? { status: "loading" } : servicesQuery.isError && !servicesQuery.data ? { status: "error", message: servicesQuery.error.message } : { status: "success", items: servicesQuery.data ?? [] };
+  const [preferredId, setPreferredId] = useState<string>();
+  const [selectionInitialized, setSelectionInitialized] = useState(false);
   const [mode, setMode] = useState<EditorMode>({ type: "create" });
   const [value, setValue] = useState<ServiceFormValues>({ ...emptyServiceForm });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
-  const load = useCallback(async (preferredId?: string) => {
-    setState({ status: "loading" });
-    try {
-      const response = await fetch("/api/admin/service-offerings", { cache: "no-store", headers: { Accept: "application/json" } });
-      const result = await response.json() as ApiResponse<AdminServiceOffering[]>;
-      if (!response.ok || "error" in result) {
-        const auth = response.status === 401 || response.status === 403;
-        setState({ status: "error", message: auth ? "관리자 로그인이 만료되었습니다. 다시 로그인해 주세요." : "서비스 목록을 불러오지 못했습니다." }); return;
-      }
-      setState({ status: "success", items: result.data });
-      const selected = result.data.find((item) => item.id === preferredId) ?? result.data[0];
-      if (selected) { setMode({ type: "edit", id: selected.id }); setValue(serviceToFormValues(selected)); }
-      else { setMode({ type: "create" }); setValue({ ...emptyServiceForm }); }
-    } catch { setState({ status: "error", message: "네트워크 문제로 서비스 목록을 불러오지 못했습니다." }); }
-  }, []);
-
-  useEffect(() => { queueMicrotask(() => void load()); }, [load]);
+  useEffect(() => { if (!servicesQuery.data || (!preferredId && selectionInitialized)) return; queueMicrotask(() => { const selected = servicesQuery.data!.find((item) => item.id === preferredId) ?? servicesQuery.data![0]; if (selected) { setMode({ type: "edit", id: selected.id }); setValue(serviceToFormValues(selected)); } else { setMode({ type: "create" }); setValue({ ...emptyServiceForm }); } setSelectionInitialized(true); }); }, [servicesQuery.data, preferredId, selectionInitialized]);
   const select = (item: AdminServiceOffering) => { setMode({ type: "edit", id: item.id }); setValue(serviceToFormValues(item)); setErrors({}); setMessage(null); };
   const create = () => { setMode({ type: "create" }); setValue({ ...emptyServiceForm }); setErrors({}); setMessage(null); };
 
@@ -80,13 +70,14 @@ function ServiceManager() {
         return;
       }
       setMessage({ tone: "success", text: editing ? "서비스를 수정했습니다." : "새 서비스를 만들었습니다." });
-      await load(result.data.id);
+      setPreferredId(result.data.id);
+      await queryClient.invalidateQueries({ queryKey: adminAutomationContentQueryKeys.services.list() });
     } catch { setMessage({ tone: "error", text: "네트워크 문제로 서비스를 저장하지 못했습니다." }); }
     finally { setSaving(false); }
   }
 
   return <div id="services-panel" role="tabpanel" aria-labelledby="services-tab" className="grid xl:grid-cols-[0.7fr_1.3fr]">
-    <ContentList state={state} selectedId={mode.type === "edit" ? mode.id : null} label="서비스" getId={(item) => item.id} render={(item) => <><strong className="block text-sm">{item.name}</strong><span className="mt-1 block text-xs text-[#617068]">{item.priceLabel} · 순서 {item.sortOrder} · {item.isPublished ? "게시" : "비공개"}</span></>} onSelect={select} onRefresh={() => void load(mode.type === "edit" ? mode.id : undefined)} onCreate={create} saving={saving} />
+    <ContentList state={state} selectedId={mode.type === "edit" ? mode.id : null} label="서비스" getId={(item) => item.id} render={(item) => <><strong className="block text-sm">{item.name}</strong><span className="mt-1 block text-xs text-[#617068]">{item.priceLabel} · 순서 {item.sortOrder} · {item.isPublished ? "게시" : "비공개"}</span></>} onSelect={select} onRefresh={() => void servicesQuery.refetch()} onCreate={create} saving={saving} />
     <EditorShell title={mode.type === "create" ? "새 서비스" : value.name || "서비스 수정"} message={message}>
       <form onSubmit={(event) => { event.preventDefault(); void save(); }} className="grid gap-4">
         <div className="grid gap-4 sm:grid-cols-2"><Field label="서비스명" error={errors.name?.[0]}><TextInput value={value.name} onChange={(name) => setValue({ ...value, name })} disabled={saving} maxLength={120} required /></Field><Field label="slug" hint="영문 소문자와 하이픈" error={errors.slug?.[0]}><TextInput value={value.slug} onChange={(slug) => setValue({ ...value, slug })} disabled={saving} maxLength={100} required /></Field></div>
@@ -103,25 +94,17 @@ function ServiceManager() {
 }
 
 function FaqManager() {
-  const [state, setState] = useState<LoadState<AdminFaqItem>>({ status: "loading" });
+  const queryClient = useQueryClient();
+  const faqsQuery = useQuery({ queryKey: adminAutomationContentQueryKeys.faqs.list(), queryFn: ({ signal }) => fetchAdminFaqs({ signal }) });
+  const state: LoadState<AdminFaqItem> = faqsQuery.isPending && !faqsQuery.data ? { status: "loading" } : faqsQuery.isError && !faqsQuery.data ? { status: "error", message: faqsQuery.error.message } : { status: "success", items: faqsQuery.data ?? [] };
+  const [preferredId, setPreferredId] = useState<string>();
+  const [selectionInitialized, setSelectionInitialized] = useState(false);
   const [mode, setMode] = useState<EditorMode>({ type: "create" });
   const [value, setValue] = useState<FaqFormValues>({ ...emptyFaqForm });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-  const load = useCallback(async (preferredId?: string) => {
-    setState({ status: "loading" });
-    try {
-      const response = await fetch("/api/admin/faqs", { cache: "no-store", headers: { Accept: "application/json" } });
-      const result = await response.json() as ApiResponse<AdminFaqItem[]>;
-      if (!response.ok || "error" in result) { const auth = response.status === 401 || response.status === 403; setState({ status: "error", message: auth ? "관리자 로그인이 만료되었습니다. 다시 로그인해 주세요." : "FAQ 목록을 불러오지 못했습니다." }); return; }
-      setState({ status: "success", items: result.data });
-      const selected = result.data.find((item) => item.id === preferredId) ?? result.data[0];
-      if (selected) { setMode({ type: "edit", id: selected.id }); setValue(faqToFormValues(selected)); }
-      else { setMode({ type: "create" }); setValue({ ...emptyFaqForm }); }
-    } catch { setState({ status: "error", message: "네트워크 문제로 FAQ 목록을 불러오지 못했습니다." }); }
-  }, []);
-  useEffect(() => { queueMicrotask(() => void load()); }, [load]);
+  useEffect(() => { if (!faqsQuery.data || (!preferredId && selectionInitialized)) return; queueMicrotask(() => { const selected = faqsQuery.data!.find((item) => item.id === preferredId) ?? faqsQuery.data![0]; if (selected) { setMode({ type: "edit", id: selected.id }); setValue(faqToFormValues(selected)); } else { setMode({ type: "create" }); setValue({ ...emptyFaqForm }); } setSelectionInitialized(true); }); }, [faqsQuery.data, preferredId, selectionInitialized]);
   const select = (item: AdminFaqItem) => { setMode({ type: "edit", id: item.id }); setValue(faqToFormValues(item)); setErrors({}); setMessage(null); };
   const create = () => { setMode({ type: "create" }); setValue({ ...emptyFaqForm }); setErrors({}); setMessage(null); };
   async function save() {
@@ -130,12 +113,12 @@ function FaqManager() {
       const response = await fetch(editing ? `/api/admin/faqs/${mode.id}` : "/api/admin/faqs", { method: editing ? "PATCH" : "POST", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify(buildFaqPayload(value)) });
       const result = await response.json() as ApiResponse<AdminFaqItem>;
       if (!response.ok || "error" in result) { if ("error" in result) { const failure = getContentSaveFailure(response.status, result); setErrors(failure.fieldErrors); setMessage({ tone: "error", text: failure.message }); } else setMessage({ tone: "error", text: "FAQ를 저장하지 못했습니다." }); return; }
-      setMessage({ tone: "success", text: editing ? "FAQ를 수정했습니다." : "새 FAQ를 만들었습니다." }); await load(result.data.id);
+      setMessage({ tone: "success", text: editing ? "FAQ를 수정했습니다." : "새 FAQ를 만들었습니다." }); setPreferredId(result.data.id); await queryClient.invalidateQueries({ queryKey: adminAutomationContentQueryKeys.faqs.list() });
     } catch { setMessage({ tone: "error", text: "네트워크 문제로 FAQ를 저장하지 못했습니다." }); }
     finally { setSaving(false); }
   }
   return <div id="faqs-panel" role="tabpanel" aria-labelledby="faqs-tab" className="grid xl:grid-cols-[0.7fr_1.3fr]">
-    <ContentList state={state} selectedId={mode.type === "edit" ? mode.id : null} label="FAQ" getId={(item) => item.id} render={(item) => <><strong className="block text-sm">{item.question}</strong><span className="mt-1 block text-xs text-[#617068]">순서 {item.sortOrder} · {item.isPublished ? "게시" : "비공개"}</span></>} onSelect={select} onRefresh={() => void load(mode.type === "edit" ? mode.id : undefined)} onCreate={create} saving={saving} />
+    <ContentList state={state} selectedId={mode.type === "edit" ? mode.id : null} label="FAQ" getId={(item) => item.id} render={(item) => <><strong className="block text-sm">{item.question}</strong><span className="mt-1 block text-xs text-[#617068]">순서 {item.sortOrder} · {item.isPublished ? "게시" : "비공개"}</span></>} onSelect={select} onRefresh={() => void faqsQuery.refetch()} onCreate={create} saving={saving} />
     <EditorShell title={mode.type === "create" ? "새 FAQ" : value.question || "FAQ 수정"} message={message}>
       <form onSubmit={(event) => { event.preventDefault(); void save(); }} className="grid gap-4">
         <Field label="질문" error={errors.question?.[0]}><TextArea value={value.question} onChange={(question) => setValue({ ...value, question })} disabled={saving} maxLength={500} rows={3} required /></Field>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   CheckCircle2,
@@ -29,6 +30,13 @@ import { Button } from "@/shared/ui/button";
 import type { ApiResponse } from "@/shared/types/api";
 import { redirectToAdminLogin } from "@/shared/lib/auth/admin-login-redirect";
 import { InquirySelectionButton } from "./inquiry-selection-button";
+import {
+  AdminInquiryQueryError,
+  adminInquiryQueryKeys,
+  fetchAdminInquiryDetail,
+  fetchAdminInquiryList,
+} from "../model/admin-inquiry-queries";
+import { resetAdminWorkItemsCache } from "@/entities/admin-work-item/model/reset-query-cache";
 
 type InquiryListState =
   | { status: "loading" }
@@ -51,97 +59,57 @@ const inquiryStatuses: InquiryStatus[] = [
 ];
 
 export function AdminInquiryList() {
-  const [state, setState] = useState<InquiryListState>({ status: "loading" });
+  const queryClient = useQueryClient();
+  const inquiriesQuery = useQuery({
+    queryKey: adminInquiryQueryKeys.list(),
+    queryFn: ({ signal }) => fetchAdminInquiryList({ signal }),
+  });
   const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(
     null,
   );
-  const [detailState, setDetailState] = useState<DetailState>({
-    status: "idle",
+  const [notice, setNotice] = useState<string>();
+  const detailQuery = useQuery({
+    queryKey: adminInquiryQueryKeys.detail(selectedInquiryId ?? ""),
+    queryFn: ({ signal }) => fetchAdminInquiryDetail(selectedInquiryId!, { signal }),
+    enabled: Boolean(selectedInquiryId),
   });
 
-  const fetchInquiries = useCallback(async () => {
-    try {
-      const response = await fetch("/api/admin/inquiries", {
-        headers: {
-          Accept: "application/json",
-        },
-      });
-
-      if (response.status === 401 || response.status === 403) {
-        redirectToAdminLogin();
-        return;
-      }
-
-      const result = (await response.json()) as ApiResponse<
-        AdminInquiryListItem[]
-      >;
-
-      if (!response.ok || "error" in result) {
-        setState({
-          status: "error",
-          message:
-            "error" in result
-              ? result.error.message
-              : "문의 목록을 불러오지 못했습니다.",
-        });
-        return;
-      }
-
-      setSelectedInquiryId((currentInquiryId) =>
-        currentInquiryId &&
-        result.data.some((inquiry) => inquiry.id === currentInquiryId)
-          ? currentInquiryId
-          : result.data[0]?.id ?? null,
-      );
-
-      setState(
-        result.data.length > 0
-          ? { status: "success", inquiries: result.data }
-          : { status: "empty" },
-      );
-
-      if (result.data.length === 0) {
-        setDetailState({ status: "idle" });
-      }
-    } catch {
-      setState({
-        status: "error",
-        message: "네트워크 문제로 문의 목록을 불러오지 못했습니다.",
-      });
-    }
-  }, []);
-
-  function refreshInquiries() {
-    setState({ status: "loading" });
-    void fetchInquiries();
-  }
-
-  function updateListItem(updatedInquiry: AdminInquiryDetail) {
-    setState((currentState) => {
-      if (currentState.status !== "success") {
-        return currentState;
-      }
-
-      return {
-        status: "success",
-        inquiries: currentState.inquiries.map((inquiry) =>
-          inquiry.id === updatedInquiry.id
-            ? {
-                ...inquiry,
-                status: updatedInquiry.status,
-                updated_at: updatedInquiry.updated_at,
-              }
-            : inquiry,
-        ),
-      };
-    });
-  }
+  const inquiries = inquiriesQuery.data ?? [];
+  const state: InquiryListState = inquiriesQuery.isPending && !inquiriesQuery.data
+    ? { status: "loading" }
+    : inquiriesQuery.isError && !inquiriesQuery.data
+      ? { status: "error", message: inquiriesQuery.error.message }
+      : inquiries.length > 0
+        ? { status: "success", inquiries }
+        : { status: "empty" };
+  const detailState: DetailState = !selectedInquiryId
+    ? { status: "idle" }
+    : detailQuery.isPending && !detailQuery.data
+      ? { status: "loading" }
+      : detailQuery.isError && !detailQuery.data
+        ? { status: "error", message: detailQuery.error.message }
+        : detailQuery.data
+          ? { status: "success", inquiry: detailQuery.data, notice }
+          : { status: "loading" };
 
   useEffect(() => {
-    queueMicrotask(() => {
-      void fetchInquiries();
-    });
-  }, [fetchInquiries]);
+    if (
+      (inquiriesQuery.error instanceof AdminInquiryQueryError &&
+        [401, 403].includes(inquiriesQuery.error.status ?? 0)) ||
+      (detailQuery.error instanceof AdminInquiryQueryError &&
+        [401, 403].includes(detailQuery.error.status ?? 0))
+    ) {
+      redirectToAdminLogin();
+    }
+  }, [detailQuery.error, inquiriesQuery.error]);
+
+  useEffect(() => {
+    if (!inquiriesQuery.data) return;
+    queueMicrotask(() => setSelectedInquiryId((currentId) =>
+      currentId && inquiriesQuery.data!.some(({ id }) => id === currentId)
+        ? currentId
+        : inquiriesQuery.data![0]?.id ?? null));
+  }, [inquiriesQuery.data]);
 
   useEffect(() => {
     function selectInquiryFromHash() {
@@ -158,67 +126,21 @@ export function AdminInquiryList() {
     return () => window.removeEventListener("hashchange", selectInquiryFromHash);
   }, []);
 
-  useEffect(() => {
-    if (!selectedInquiryId) {
-      return;
-    }
+  function refreshInquiries() {
+    void inquiriesQuery.refetch();
+  }
 
-    let isActive = true;
-
-    async function fetchInquiryDetail() {
-      setDetailState({ status: "loading" });
-
-      try {
-        const response = await fetch(
-          `/api/admin/inquiries/${selectedInquiryId}`,
-          {
-            headers: {
-              Accept: "application/json",
-            },
-          },
-        );
-
-        if (response.status === 401 || response.status === 403) {
-          redirectToAdminLogin();
-          return;
-        }
-
-        const result = (await response.json()) as ApiResponse<AdminInquiryDetail>;
-
-        if (!isActive) {
-          return;
-        }
-
-        if (!response.ok || "error" in result) {
-          setDetailState({
-            status: "error",
-            message:
-              "error" in result
-                ? result.error.message
-                : "문의 상세를 불러오지 못했습니다.",
-          });
-          return;
-        }
-
-        setDetailState({ status: "success", inquiry: result.data });
-      } catch {
-        if (!isActive) {
-          return;
-        }
-
-        setDetailState({
-          status: "error",
-          message: "네트워크 문제로 문의 상세를 불러오지 못했습니다.",
-        });
-      }
-    }
-
-    void fetchInquiryDetail();
-
-    return () => {
-      isActive = false;
-    };
-  }, [selectedInquiryId]);
+  function updateInquiry(updatedInquiry: AdminInquiryDetail) {
+    queryClient.setQueryData(adminInquiryQueryKeys.detail(updatedInquiry.id), updatedInquiry);
+    queryClient.setQueryData<AdminInquiryListItem[]>(adminInquiryQueryKeys.list(), (current) =>
+      current?.map((inquiry) => inquiry.id === updatedInquiry.id
+        ? { ...inquiry, status: updatedInquiry.status, updated_at: updatedInquiry.updated_at }
+        : inquiry),
+    );
+    setNotice("상태와 내부 메모를 저장했습니다.");
+    void queryClient.invalidateQueries({ queryKey: adminInquiryQueryKeys.lists() });
+    void resetAdminWorkItemsCache(queryClient);
+  }
 
   return (
     <section className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
@@ -236,9 +158,9 @@ export function AdminInquiryList() {
             size="sm"
             className="w-fit"
             onClick={refreshInquiries}
-            disabled={state.status === "loading"}
+            disabled={inquiriesQuery.isFetching}
           >
-            {state.status === "loading" ? (
+            {inquiriesQuery.isFetching ? (
               <Loader2 aria-hidden className="size-4 animate-spin" />
             ) : (
               <RefreshCw aria-hidden className="size-4" />
@@ -255,14 +177,7 @@ export function AdminInquiryList() {
 
       <InquiryDetailPanel
         state={detailState}
-        onUpdated={(updatedInquiry) => {
-          updateListItem(updatedInquiry);
-          setDetailState({
-            status: "success",
-            inquiry: updatedInquiry,
-            notice: "상태와 내부 메모를 저장했습니다.",
-          });
-        }}
+        onUpdated={updateInquiry}
       />
     </section>
   );

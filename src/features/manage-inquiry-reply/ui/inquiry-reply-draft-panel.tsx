@@ -1,15 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Bot, Check, Clipboard, Loader2, RefreshCw, RotateCcw, Save, Send, TriangleAlert } from "lucide-react";
 
 import type { InquiryReplyDraft } from "@/entities/automation";
 import type { ApiResponse } from "@/shared/types/api";
 import { Button } from "@/shared/ui/button";
 import { AdminLoginLink } from "@/shared/ui/admin-login-link";
+import { redirectToAdminLogin } from "@/shared/lib/auth/admin-login-redirect";
 import { getDraftStatusCopy, getReplyDraftFailure, getSlackDeliveryPresentation, markReplyDraftRegenerationPending, type DraftViewStatus } from "../model/reply-draft-state";
 import { ReplyDraftGenerationJobStatus } from "./reply-draft-generation-job-status";
 import { ReplyDraftGenerationMetadata } from "./reply-draft-generation-metadata";
+import { adminReplyDraftQueryKeys, fetchAdminReplyDraft, ReplyDraftQueryError } from "../model/reply-draft-queries";
+import { adminInquiryQueryKeys } from "@/entities/inquiry/model/admin-inquiry-query-keys";
+import { resetAdminWorkItemsCache } from "@/entities/admin-work-item/model/reset-query-cache";
 
 type ViewState =
   | { status: "loading" }
@@ -19,24 +24,22 @@ type ViewState =
   | { status: "error"; message: string };
 
 export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: string }>) {
-  const [state, setState] = useState<ViewState>({ status: "loading" });
+  const queryClient = useQueryClient();
+  const draftQuery = useQuery({ queryKey: adminReplyDraftQueryKeys.detail(inquiryId), queryFn: ({ signal }) => fetchAdminReplyDraft(inquiryId, signal) });
+  const state: ViewState = draftQuery.isPending && !draftQuery.data ? { status: "loading" } : draftQuery.isError && !draftQuery.data
+    ? draftQuery.error instanceof ReplyDraftQueryError && draftQuery.error.status === 404 && draftQuery.error.code === "REPLY_DRAFT_NOT_FOUND"
+      ? { status: "missing" }
+      : { status: "error", message: draftQuery.error instanceof ReplyDraftQueryError && [401, 403].includes(draftQuery.error.status) ? "관리자 로그인이 만료되었습니다. 다시 로그인해 주세요." : draftQuery.error.message }
+    : draftQuery.data?.status === "generating" ? { status: "generating" }
+      : draftQuery.data ? { status: "success", draft: draftQuery.data } : { status: "missing" };
   const [summary, setSummary] = useState("");
   const [draftText, setDraftText] = useState("");
   const [busy, setBusy] = useState<"save" | "regenerate" | "slack" | null>(null);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
-  const load = useCallback(async () => {
-    setState({ status: "loading" }); setNotice(null);
-    try {
-      const response = await fetch(`/api/admin/inquiries/${inquiryId}/reply-draft`, { cache: "no-store", headers: { Accept: "application/json" } });
-      const result = await response.json() as ApiResponse<InquiryReplyDraft>;
-      if (response.status === 404 && "error" in result && result.error.code === "REPLY_DRAFT_NOT_FOUND") { setState({ status: "missing" }); return; }
-      if (!response.ok || "error" in result) { setState({ status: "error", message: "error" in result ? getReplyDraftFailure(response.status, result) : "AI 초안을 불러오지 못했습니다." }); return; }
-      setState({ status: "success", draft: result.data }); setSummary(result.data.summary); setDraftText(result.data.draft);
-    } catch { setState({ status: "error", message: "네트워크 문제로 AI 초안을 불러오지 못했습니다." }); }
-  }, [inquiryId]);
-
-  useEffect(() => { queueMicrotask(() => void load()); }, [load]);
+  const load = () => { setNotice(null); void draftQuery.refetch(); };
+  useEffect(() => { if (draftQuery.error instanceof ReplyDraftQueryError && [401, 403].includes(draftQuery.error.status)) redirectToAdminLogin(); }, [draftQuery.error]);
+  useEffect(() => { if (draftQuery.data) queueMicrotask(() => { setSummary(draftQuery.data!.summary); setDraftText(draftQuery.data!.draft); }); }, [draftQuery.data, draftQuery.dataUpdatedAt]);
 
   async function requestAction(kind: "regenerate" | "slack") {
     setBusy(kind); setNotice(null);
@@ -47,9 +50,12 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
       if (!response.ok || "error" in result) { setNotice({ tone: "error", text: "error" in result ? getReplyDraftFailure(response.status, result) : "요청을 처리하지 못했습니다." }); return; }
       if (kind === "regenerate") {
         setNotice({ tone: "success", text: "AI 초안 재생성을 요청했습니다." });
-        setState((current) => current.status === "success" ? { status: "success", draft: markReplyDraftRegenerationPending(current.draft) } : { status: "generating" });
+        queryClient.setQueryData<InquiryReplyDraft>(adminReplyDraftQueryKeys.detail(inquiryId), (current) => current ? markReplyDraftRegenerationPending(current) : current);
+        void queryClient.invalidateQueries({ queryKey: adminReplyDraftQueryKeys.detail(inquiryId) });
+        void resetAdminWorkItemsCache(queryClient);
       } else {
-        await load();
+        await draftQuery.refetch();
+        await resetAdminWorkItemsCache(queryClient);
         setNotice({ tone: "success", text: "Slack 재전송을 요청했습니다." });
       }
     } catch { setNotice({ tone: "error", text: "네트워크 문제로 요청을 처리하지 못했습니다." }); }
@@ -63,7 +69,10 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
       const response = await fetch(`/api/admin/inquiries/${inquiryId}/reply-draft`, { method: "PATCH", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ summary, draft: draftText }) });
       const result = await response.json() as ApiResponse<{ id: string; updatedAt: string }>;
       if (!response.ok || "error" in result) { setNotice({ tone: "error", text: "error" in result ? getReplyDraftFailure(response.status, result) : "답변 초안을 저장하지 못했습니다." }); return; }
-      setState({ status: "success", draft: { ...state.draft, summary, draft: draftText, updatedAt: result.data.updatedAt } });
+      const updatedDraft = { ...state.draft, summary, draft: draftText, updatedAt: result.data.updatedAt };
+      queryClient.setQueryData(adminReplyDraftQueryKeys.detail(inquiryId), updatedDraft);
+      void queryClient.invalidateQueries({ queryKey: adminInquiryQueryKeys.all });
+      void resetAdminWorkItemsCache(queryClient);
       setNotice({ tone: "success", text: "답변 초안을 저장했습니다." });
     } catch { setNotice({ tone: "error", text: "네트워크 문제로 답변 초안을 저장하지 못했습니다." }); }
     finally { setBusy(null); }

@@ -1,12 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, UserRoundPlus } from "lucide-react";
 
 import type { AdminInquiryDetail } from "@/entities/inquiry";
 import { Button } from "@/shared/ui/button";
 import type { ApiResponse } from "@/shared/types/api";
 import { redirectToAdminLogin } from "@/shared/lib/auth/admin-login-redirect";
+import { resetAdminWorkItemsCache } from "@/entities/admin-work-item/model/reset-query-cache";
+import { adminInquiryQueryKeys } from "@/entities/inquiry/model/admin-inquiry-query-keys";
 
 import {
   buildConversionPayload,
@@ -35,6 +38,7 @@ export function InquiryConversionPanel({
   inquiry,
   onInquiryUpdated,
 }: InquiryConversionPanelProps) {
+  const queryClient = useQueryClient();
   const [customerName, setCustomerName] = useState(inquiry.customer_name);
   const [projectName, setProjectName] = useState(
     `${inquiry.company_name || inquiry.customer_name} ${inquiry.service_type}`,
@@ -95,7 +99,13 @@ export function InquiryConversionPanel({
       });
       const result = await parseJsonResponse<{ inquiry_id: string; customer_id: string; project_id: string; reused_customer: boolean; reused_project: boolean }>(response, "문의 전환을 완료하지 못했습니다.");
       if (!result) return;
-      onInquiryUpdated({ ...inquiry, status: "converted", converted_customer_id: result.customer_id, converted_project_id: result.project_id });
+      const updatedInquiry = { ...inquiry, status: "converted" as const, converted_customer_id: result.customer_id, converted_project_id: result.project_id };
+      queryClient.setQueryData(adminInquiryQueryKeys.detail(inquiry.id), updatedInquiry);
+      void queryClient.invalidateQueries({ queryKey: adminInquiryQueryKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "projects"] });
+      void resetAdminWorkItemsCache(queryClient);
+      onInquiryUpdated(updatedInquiry);
       setConversionState({
         status: "success",
         customerId: result.customer_id,
