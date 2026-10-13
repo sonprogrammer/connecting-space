@@ -49,13 +49,13 @@
 
 - group, sort, pageSize별 key 차이와 같은 인수 key의 안정성을 검사한다.
 - 동일 QueryClient에서 업무함 A 조회 → B 조회 → 30초 이내 A 조회를 수행하고 각 API fetch 횟수가 A 1회, B 1회인지 검사한다.
-- `fetchInfiniteQuery`에 51개 업무의 두 페이지 응답을 공급한다. 두 번째 요청에 page 2와 첫 응답 `asOf`가 전달되고, 총 로드 ID가 기대된 51개와 정확히 일치하며 중복 ID가 없고 순서가 보존되는지 검사한다.
+- `fetchInfiniteQuery`/observer에 51개 업무의 세 페이지 응답을 공급한다. 2·3번째 요청에 각각 연속 page와 첫 응답 `asOf`가 전달되고, 총 로드 ID가 기대된 51개와 정확히 일치하며 중복 ID가 없고 순서가 보존되는지 검사한다.
 - 그룹 필터 응답에서 `counts.total`과 다른 `pagination.total`을 반환해 UI용 전체 건수가 `pagination.total`에서 오고, loaded count는 누적 item 수에서 오는지 검사한다.
 - 마지막 응답의 `hasNextPage: false`일 때 추가 fetch가 없음을 검사한다.
 
 - [ ] **2단계: RED 확인**
 
-실행: `npm test -- --test-name-pattern='admin work items query cache'` (해당 스크립트에서 이름 필터가 동작하지 않으면 `npm test`로 확인)
+실행: `npm test`로 테스트 TypeScript를 빌드한 뒤 `node --test --test-name-pattern='admin work items query cache' .test-dist/tests/admin-today-dashboard.test.js`
 
 예상: 새 query key/options 또는 loaded-count helper 부재로 실패한다.
 
@@ -67,7 +67,7 @@
 
 - [ ] **4단계: GREEN 확인**
 
-실행: `npm test -- --test-name-pattern='admin work items query cache'`
+실행: `node --test --test-name-pattern='admin work items query cache' .test-dist/tests/admin-today-dashboard.test.js` (새 변경 후 `npm test`도 전체 회귀로 실행)
 
 예상: 캐시 재사용, snapshot 유지, 순서/중복/누락, count assertions 통과.
 
