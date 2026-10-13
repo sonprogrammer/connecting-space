@@ -1,65 +1,65 @@
-# Admin Query Cache Design
+# 관리자 조회 캐시 설계
 
-## Goal
+## 목표
 
-Reuse valid administrator read data while navigating between admin menus, while preserving the existing API contracts and keeping administrator requests out of the browser HTTP cache.
+관리자 메뉴를 이동해도 유효한 조회 데이터를 재사용한다. 기존 API 계약을 그대로 따르고, 관리자 요청은 브라우저 HTTP 캐시에 저장하지 않는다.
 
-## Context and constraints
+## 현황과 제약
 
-- The shared admin `QueryClient` already configures `staleTime: 30_000` and `gcTime: 300_000`.
-- Customer, project, and project-payment reads already use React Query. Their existing query keys include list/detail identifiers and list parameters, and their fetchers use `cache: "no-store"`.
-- The inquiry dashboard list/detail, admin portfolio list, service-offering/FAQ reads, and inquiry reply-draft reads currently fetch directly from UI components. These reads do not share query cache between unmount/remount navigation.
-- `/api/admin/inquiries` currently returns a plain list array (maximum 100 rows). It does not define group, sort, cursor/page, `asOf`, or total-count fields. This work must not invent them.
-- Customer/project APIs define page-index pagination (`page`, `pageSize`, `total`, `totalPages`) but do not define an `asOf` snapshot token. Existing page navigation remains page-index based; no snapshot-consistency guarantee is added.
-- The `asOf` value described in the request is a common API design for pinning subsequent pages to the first page's point-in-time view. It is not part of the inspected inquiry API contract, so this design neither sends nor synthesizes it.
+- 공용 관리자 `QueryClient`에는 이미 `staleTime: 30_000`(30초), `gcTime: 300_000`(5분)이 설정되어 있다.
+- 고객·프로젝트·프로젝트 결제 조회는 이미 React Query를 사용한다. query key에 상세 ID나 목록 인수가 포함되며, fetcher는 `cache: "no-store"`를 사용한다.
+- 대시보드 문의 목록·상세, 관리자 포트폴리오 목록, 서비스 제공 항목·FAQ, 문의 답변 초안 조회는 UI 컴포넌트에서 직접 fetch한다. 메뉴를 이동하며 컴포넌트가 해제되면 이 조회 데이터는 재사용되지 않는다.
+- 현재 `/api/admin/inquiries`는 최대 100건의 배열을 반환한다. 그룹, 정렬, 커서/페이지, `asOf`, 전체 건수 필드는 계약에 없다. 이 작업에서 이를 임의로 추가하지 않는다.
+- 고객·프로젝트 API는 `page`, `pageSize`, `total`, `totalPages`를 사용하는 페이지 번호 기반 페이지네이션 계약이 있지만 `asOf` 스냅샷 값은 없다. 기존 페이지 이동 방식을 유지하며 동일 시점 스냅샷을 보장한다고 간주하지 않는다.
+- `asOf`는 일반적으로 첫 페이지의 조회 시점을 고정해 다음 페이지도 같은 시점의 결과를 이어 읽도록 하는 API 값이다. 확인한 문의 API 계약에는 없으므로 이 설계에서 보내거나 만들어내지 않는다.
 
-## Selected approach
+## 선택한 접근 방식
 
-Use the existing shared React Query client for all admin GET data currently held in component-local fetch state, and retain the existing React Query implementation for customer/project/payment data. A small, domain-owned query-key/fetcher module per feature will expose stable keys and typed fetchers; query functions will use `cache: "no-store"` and preserve current authentication handling and user-facing errors.
+컴포넌트 상태에 직접 보관하는 관리자 GET 데이터를 기존 공용 React Query 클라이언트로 옮기고, 이미 React Query를 쓰는 고객·프로젝트·결제 조회는 유지한다. 각 기능 영역이 안정적인 query key와 타입이 지정된 fetcher를 제공하도록 한다. query 함수는 `cache: "no-store"`를 사용하고, 현재의 인증 처리와 사용자에게 표시되는 오류 동작을 보존한다.
 
-Alternative: migrate only the dashboard inquiry list. This would fix one menu transition, but leave the same cache-loss behavior in portfolio, automation content, and reply-draft reads. The selected scope covers those remaining admin read paths without changing their APIs or UI flows.
+대안: 대시보드 문의 목록만 옮긴다. 메뉴 이동 시 발생하는 문제 한 곳은 해결되지만 포트폴리오, 자동화 콘텐츠, 답변 초안 조회에는 같은 문제가 남는다. 선택한 범위는 API나 화면 흐름을 바꾸지 않고 나머지 관리자 조회에도 적용한다.
 
-Alternative: introduce infinite pagination or a client-side snapshot token for inquiries. This is rejected because the endpoint has no pagination or `asOf` contract, and fabricating either would risk duplicate or missing rows.
+대안: 문의 목록에 무한 스크롤 페이지네이션이나 클라이언트 스냅샷 값을 도입한다. 현재 API에 페이지네이션 또는 `asOf` 계약이 없으므로, 중복·누락 가능성이 있는 동작을 임의로 만들지 않기 위해 제외한다.
 
-## Query identity and navigation behavior
+## Query 식별 및 메뉴 이동 동작
 
-- Query keys are namespaced by admin domain and distinguish list from detail. Every variable that changes a response (including entity ID and existing list page/search/status parameters) is part of the key.
-- Dashboard inquiry list uses one stable list key. Inquiry detail and reply-draft queries use their entity IDs in separate detail keys.
-- Portfolio, service offerings, and FAQs use separate list keys so their cached data cannot collide.
-- Existing customer, project, and payment key factories remain authoritative; their keys continue to include existing list/detail inputs.
-- Admin menu navigation does not clear the shared QueryClient. Returning to a successful query within 30 seconds reuses its cached result without an HTTP request. Stale entries may refetch under the existing query behavior; entries are eligible for garbage collection after five minutes unused.
-- Manual refresh/retry continues to refetch the active query. Unauthorized responses keep the existing safe login redirect behavior where currently present; other failures remain visible and retryable.
+- query key는 관리자 기능 영역별로 네임스페이스를 분리하고 목록과 상세를 구별한다. 응답에 영향을 주는 값(엔티티 ID, 기존 목록 페이지·검색어·상태 등)은 모두 key에 포함한다.
+- 대시보드 문의 목록은 고정된 목록 key를 사용한다. 문의 상세와 답변 초안은 각각 문의 ID를 포함하는 별도 상세 key를 사용한다.
+- 포트폴리오, 서비스 제공 항목, FAQ는 서로 다른 목록 key를 사용한다.
+- 고객·프로젝트·결제 조회는 기존 key factory를 기준으로 유지하고, 기존의 모든 조회 인수를 key에 포함한다.
+- 관리자 메뉴 이동 시 공용 `QueryClient`를 초기화하지 않는다. 성공한 조회로부터 30초 내에 돌아오면 캐시 결과를 사용하고 HTTP 요청을 다시 보내지 않는다. 30초가 지난 데이터는 기존 React Query 동작에 따라 재조회될 수 있으며, 사용되지 않은 캐시는 5분 뒤 가비지 컬렉션 대상이 된다.
+- 수동 새로고침과 재시도는 활성 query를 다시 조회한다. 현재 로그인 이동 처리가 있는 조회의 401/403 동작은 보존하며, 다른 오류는 기존처럼 사용자에게 표시하고 재시도할 수 있게 한다.
 
-## Mutation consistency
+## 변경 작업 후 캐시 일관성
 
-After a successful data-changing operation, invalidate only related admin queries, using shared key prefixes rather than component-local state updates as the source of truth:
+변경 작업이 성공하면 컴포넌트 로컬 상태 대신 공유 key 접두사를 사용해 관련 관리자 조회만 무효화한다.
 
-- Inquiry status/reply/conversion changes invalidate inquiry list and affected inquiry detail/reply-draft data; conversion also invalidates customer/project lists where those records can change.
-- Customer and project saves invalidate their corresponding list prefixes and update the saved detail cache from the returned entity as they do today.
-- Payment/receipt mutations continue invalidating the affected payment detail; any changed project summary/list is invalidated only if its existing response includes the changed data.
-- Portfolio, service-offering, and FAQ mutations invalidate their matching lists.
-- Failed mutations do not invalidate caches.
+- 문의 상태·답변·프로젝트 전환은 문의 목록과 영향을 받은 문의 상세/답변 초안 조회를 무효화한다. 전환으로 고객이나 프로젝트 목록이 바뀔 수 있다면 그 목록도 무효화한다.
+- 고객·프로젝트 저장은 해당 목록 key 영역을 무효화하고, 반환된 엔티티로 상세 캐시를 갱신하는 기존 동작을 유지한다.
+- 결제·영수증 변경은 해당 결제 상세를 계속 무효화한다. 기존 프로젝트 요약/목록 응답이 변경 데이터를 포함하는 경우에만 관련 목록도 무효화한다.
+- 포트폴리오·서비스 제공 항목·FAQ 변경은 각각 대응하는 목록을 무효화한다.
+- 실패한 변경 작업은 캐시를 무효화하지 않는다.
 
-No optimistic updates are required by this change. The active view should show cached data while a stale refetch runs, and show the existing error/retry UI if refresh fails.
+이 변경에서 낙관적 업데이트는 요구하지 않는다. 캐시 데이터가 있으면 백그라운드 재조회 중에도 보여주며, 갱신 실패 시 기존 오류/재시도 UI를 사용한다.
 
-## Counts and pagination
+## 건수와 페이지네이션
 
-- For customer/project paginated responses, show the server-provided `pagination.total` as the overall result count and derive the visible/currently loaded count only from records actually present in the active query result. Do not label the current page length as the total.
-- Keep page-index navigation and its API parameters. Each page is a distinct query cache entry, allowing return to a previously visited page within the cache window.
-- Do not concatenate pages or add `useInfiniteQuery` for endpoints whose current contract has no continuation mechanism. The inquiry list retains its current server-defined array limit and has no invented overall count.
-- No `asOf` propagation is added because none of these relevant contracts currently return one.
+- 고객·프로젝트 페이지네이션 응답에서는 `pagination.total`을 전체 결과 건수로 표시한다. 현재 페이지 query 결과에 실제로 들어 있는 레코드 수는 별도의 현재 조회 건수로 표시하며, 현재 페이지 건수를 전체 건수처럼 표시하지 않는다.
+- 페이지 번호 기반 이동과 API 인수를 유지한다. 각 페이지는 별도의 query 캐시 항목이므로 캐시 유효 시간 내에는 이전에 방문한 페이지를 재사용할 수 있다.
+- 기존 계약에 페이지 연결 방식이 없는 endpoint에는 페이지를 이어 붙이거나 `useInfiniteQuery`를 추가하지 않는다. 문의 목록은 서버가 정의한 최대 100건 배열을 유지하며, 계약에 없는 전체 건수는 표시하지 않는다.
+- 관련 API 응답에 `asOf`가 없으므로 다음 페이지 요청에 `asOf`를 전달하는 동작은 추가하지 않는다.
 
-## Testing and acceptance
+## 테스트 및 완료 기준
 
-- Query/fetcher tests verify the query key changes for every response-shaping input, preserve `cache: "no-store"`, parse the existing response shapes, and expose errors without replacing them with fake rows.
-- A QueryClient-backed navigation test mounts query A, visits query B, then revisits A within 30 seconds and verifies A's query function/HTTP fetch ran once. Use the same provider/client to reflect admin route navigation.
-- Mutation tests verify successful changes invalidate the intended query prefixes and failures do not invalidate them.
-- Pagination tests use the existing customer/project API contract with more than 25 records across pages. They verify `pagination.total` remains the overall count, current loaded/visible records are counted separately, and page results are not concatenated or duplicated by the UI. They do not assert snapshot consistency or `asOf` semantics.
-- Existing loading, empty, error/retry, unauthorized, search/filter/page, and mutation behavior remains covered by focused tests and the repository suite.
-- Run `npm test`, `npm run lint`, `npm run type-check`, `npm run build -- --webpack`, and `git diff --check` before PR creation. PR will document exact outputs and any manual browser checks; no remote DB, deployment, or merge is in scope.
+- query/fetcher 테스트는 응답을 바꾸는 각 인수에 따라 key가 달라지는지, `cache: "no-store"`를 유지하는지, 기존 응답 형식을 파싱하는지, 오류를 가짜 데이터로 대체하지 않는지 확인한다.
+- QueryClient를 사용하는 메뉴 이동 테스트에서 A 조회 후 B로 이동하고 30초 안에 A로 돌아왔을 때 A의 query 함수/HTTP fetch가 한 번만 실행됐는지 확인한다. 관리자 route 이동과 같이 동일 provider/client를 사용한다.
+- 변경 작업 테스트는 성공 시 의도된 query 영역이 무효화되고 실패 시 무효화되지 않는지 확인한다.
+- 25건을 초과하는 기존 고객·프로젝트 페이지네이션 데이터를 테스트한다. `pagination.total`이 전체 건수로 유지되고, 현재 조회 건수가 별도로 집계되며, UI에서 페이지 결과를 임의로 합치거나 중복 표시하지 않는지 확인한다. 스냅샷 일관성이나 `asOf` 의미를 검증하지 않는다.
+- 로딩, 빈 결과, 오류/재시도, 인증 실패, 검색/필터/페이지 이동, 변경 작업에 대한 기존 동작을 집중 테스트와 저장소 전체 테스트로 확인한다.
+- PR 전에 `npm test`, `npm run lint`, `npm run type-check`, `npm run build -- --webpack`, `git diff --check`를 실행한다. PR에 실제 결과와 수동 브라우저 확인 여부를 기록한다. 원격 DB, 배포, 머지는 범위에서 제외한다.
 
-## Explicitly out of scope
+## 명시적 제외 범위
 
-- Adding or changing API endpoints/contracts, including inquiry grouping/sorting, cursor pagination, snapshot consistency, or `asOf`.
-- Backend, database, migration, deployment, or merge work.
-- Reworking admin visual design or routing.
+- 관리자 문의 그룹/정렬, 커서 페이지네이션, 스냅샷 일관성 또는 `asOf`를 포함한 API 추가·변경.
+- 백엔드, 데이터베이스, migration, 배포, 머지 작업.
+- 관리자 화면 디자인이나 라우팅 개편.
