@@ -31,7 +31,7 @@
 
 ---
 
-### 작업 1: 업무함 무한 query와 페이지 건수
+### Task 1: 업무함 무한 query와 페이지 건수
 
 **파일:**
 - 수정: `src/widgets/admin-dashboard/model/admin-today-dashboard.ts`
@@ -78,7 +78,7 @@ git add src/widgets/admin-dashboard/model/admin-today-dashboard.ts src/widgets/a
 git commit -m "feat: cache admin work item pages"
 ```
 
-### 작업 2: 대시보드 레거시 문의 query
+### Task 2: 대시보드 레거시 문의 query
 
 **파일:**
 - 생성: `src/widgets/admin-dashboard/model/admin-inquiry-queries.ts`
@@ -116,7 +116,7 @@ git add src/widgets/admin-dashboard/model/admin-inquiry-queries.ts src/widgets/a
 git commit -m "feat: cache admin inquiry reads"
 ```
 
-### 작업 3: 포트폴리오·서비스·FAQ 조회 query화
+### Task 3: 포트폴리오·서비스·FAQ 조회 query화
 
 **파일:**
 - 생성: `src/widgets/admin-portfolio/model/admin-portfolio-queries.ts`
@@ -156,7 +156,7 @@ git add src/widgets/admin-portfolio src/widgets/admin-automation-content tests/a
 git commit -m "feat: cache admin content reads"
 ```
 
-### 작업 4: 답변 초안 조회 및 mutation 캐시
+### Task 4: 답변 초안 조회 및 mutation 캐시
 
 **파일:**
 - 생성: `src/features/manage-inquiry-reply/model/reply-draft-queries.ts`
@@ -195,7 +195,7 @@ git add src/features/manage-inquiry-reply src/features/convert-inquiry-to-projec
 git commit -m "feat: cache admin reply draft reads"
 ```
 
-### 작업 5: 견적·결제·고객/프로젝트 변경 후 업무함 무효화
+### Task 5: 견적·결제·고객/프로젝트 변경 후 업무함 무효화
 
 **파일:**
 - 수정: `src/widgets/admin-quote-workflow/ui/admin-quote-workflow.tsx`
@@ -239,7 +239,7 @@ git add src/widgets/admin-quote-workflow/ui/admin-quote-workflow.tsx src/widgets
 git commit -m "fix: invalidate admin work queue after mutations"
 ```
 
-### 작업 6: 통합 검증과 PR 인계
+### Task 6: 통합 검증과 PR 인계
 
 **파일:**
 - 수정될 수 있음: 앞선 작업 파일과 테스트.
