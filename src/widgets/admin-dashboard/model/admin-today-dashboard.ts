@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { infiniteQueryOptions } from "@tanstack/react-query";
 
 export const workItemGroups = ["all", "newInquiry", "quote", "projectConversion", "overduePayment"] as const;
 export type WorkItemGroup = (typeof workItemGroups)[number];
@@ -46,6 +47,43 @@ export const adminWorkItemsResponseSchema = z.object({
 
 export type AdminWorkItemsResponse = z.infer<typeof adminWorkItemsResponseSchema>;
 export type AdminWorkItem = AdminWorkItemsResponse["items"][number];
+export type AdminWorkItemsPageParam = { page: number; asOf?: string };
+
+export const adminWorkItemsQueryKeys = {
+  all: ["admin", "work-items"] as const,
+  list: ({ group, sort, pageSize }: { group: WorkItemGroup; sort: WorkItemSort; pageSize: number }) =>
+    [...adminWorkItemsQueryKeys.all, "list", { group, sort, pageSize }] as const,
+};
+
+export function adminWorkItemsInfiniteQueryOptions(
+  query: { group: WorkItemGroup; sort: WorkItemSort; pageSize: number },
+  fetcher: typeof fetch = fetch,
+) {
+  return infiniteQueryOptions({
+    queryKey: adminWorkItemsQueryKeys.list(query),
+    initialPageParam: { page: 1 } as AdminWorkItemsPageParam,
+    queryFn: ({ pageParam, signal }) => fetchAdminWorkItems(
+      {
+        ...query,
+        page: pageParam.page,
+        ...(pageParam.asOf ? { asOf: pageParam.asOf } : {}),
+      },
+      fetcher,
+      signal,
+    ),
+    getNextPageParam: (lastPage, allPages) => lastPage.pagination.hasNextPage
+      ? { page: lastPage.pagination.page + 1, asOf: allPages[0]!.asOf }
+      : undefined,
+  });
+}
+
+export function getAdminWorkItemsLoadedCount(pages: readonly AdminWorkItemsResponse[]) {
+  return pages.reduce((count, page) => count + page.items.length, 0);
+}
+
+export function getAdminWorkItemsTotal(page: AdminWorkItemsResponse | undefined) {
+  return page?.pagination.total ?? 0;
+}
 
 export function appendAdminWorkItemsPage(
   currentItems: AdminWorkItemsResponse["items"],
