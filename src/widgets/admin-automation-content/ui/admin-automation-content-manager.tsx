@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, BookOpenText, CheckCircle2, FilePlus2, Loader2, RefreshCw, Save, Settings2 } from "lucide-react";
 
@@ -13,9 +13,10 @@ import {
 import type { ApiResponse } from "@/shared/types/api";
 import { AdminLoginLink } from "@/shared/ui/admin-login-link";
 import { Button } from "@/shared/ui/button";
+import { areEditableFormValuesEqual, getCachedQueryListState, syncEditableFormState, type AdminQueryListState } from "@/shared/lib/admin-editable-query-state";
 import { adminAutomationContentQueryKeys, fetchAdminFaqs, fetchAdminServices } from "../model/admin-automation-content-queries";
 
-type LoadState<T> = { status: "loading" } | { status: "success"; items: T[] } | { status: "error"; message: string };
+type LoadState<T> = AdminQueryListState<T>;
 type EditorMode = { type: "create" } | { type: "edit"; id: string };
 
 export function AdminAutomationContentManager() {
@@ -45,18 +46,36 @@ function Tab({ active, onClick, onKeyDown, id, controls, children }: Readonly<{ 
 function ServiceManager() {
   const queryClient = useQueryClient();
   const servicesQuery = useQuery({ queryKey: adminAutomationContentQueryKeys.services.list(), queryFn: ({ signal }) => fetchAdminServices({ signal }) });
-  const state: LoadState<AdminServiceOffering> = servicesQuery.isPending && !servicesQuery.data ? { status: "loading" } : servicesQuery.isError && !servicesQuery.data ? { status: "error", message: servicesQuery.error.message } : { status: "success", items: servicesQuery.data ?? [] };
+  const state = getCachedQueryListState({ data: servicesQuery.data, isPending: servicesQuery.isPending, isError: servicesQuery.isError, errorMessage: servicesQuery.error?.message });
   const [preferredId, setPreferredId] = useState<string>();
   const [selectionInitialized, setSelectionInitialized] = useState(false);
   const [mode, setMode] = useState<EditorMode>({ type: "create" });
   const [value, setValue] = useState<ServiceFormValues>({ ...emptyServiceForm });
+  const formBaseline = useRef<ServiceFormValues | null>(null);
+  const formItemId = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
-  useEffect(() => { if (!servicesQuery.data || (!preferredId && selectionInitialized)) return; queueMicrotask(() => { const selected = servicesQuery.data!.find((item) => item.id === preferredId) ?? servicesQuery.data![0]; if (selected) { setMode({ type: "edit", id: selected.id }); setValue(serviceToFormValues(selected)); } else { setMode({ type: "create" }); setValue({ ...emptyServiceForm }); } setSelectionInitialized(true); }); }, [servicesQuery.data, preferredId, selectionInitialized]);
-  const select = (item: AdminServiceOffering) => { setMode({ type: "edit", id: item.id }); setValue(serviceToFormValues(item)); setErrors({}); setMessage(null); };
-  const create = () => { setMode({ type: "create" }); setValue({ ...emptyServiceForm }); setErrors({}); setMessage(null); };
+  useEffect(() => {
+    if (!servicesQuery.data) return;
+    const selectedId = preferredId ?? (mode.type === "edit" ? mode.id : undefined);
+    if (!selectedId && selectionInitialized) return;
+    queueMicrotask(() => {
+      const selected = (selectedId ? servicesQuery.data!.find((item) => item.id === selectedId) : undefined)
+        ?? (!selectedId ? servicesQuery.data![0] : undefined);
+      if (!selected) return;
+      const incoming = serviceToFormValues(selected);
+      if (mode.type !== "edit" || mode.id !== selected.id) setMode({ type: "edit", id: selected.id });
+      const synced = syncEditableFormState({ currentId: formItemId.current, incomingId: selected.id, current: value, baseline: formBaseline.current, incoming });
+      formItemId.current = selected.id;
+      formBaseline.current = synced.baseline;
+      if (!areEditableFormValuesEqual(value, synced.values)) setValue(synced.values);
+      setSelectionInitialized(true);
+    });
+  }, [servicesQuery.data, preferredId, selectionInitialized, mode, value]);
+  const select = (item: AdminServiceOffering) => { const incoming = serviceToFormValues(item); setPreferredId(undefined); setMode({ type: "edit", id: item.id }); formItemId.current = item.id; formBaseline.current = incoming; setValue(incoming); setErrors({}); setMessage(null); };
+  const create = () => { setPreferredId(undefined); setMode({ type: "create" }); setValue({ ...emptyServiceForm }); formItemId.current = null; formBaseline.current = { ...emptyServiceForm }; setErrors({}); setMessage(null); };
 
   async function save() {
     setSaving(true); setErrors({}); setMessage(null);
@@ -96,17 +115,35 @@ function ServiceManager() {
 function FaqManager() {
   const queryClient = useQueryClient();
   const faqsQuery = useQuery({ queryKey: adminAutomationContentQueryKeys.faqs.list(), queryFn: ({ signal }) => fetchAdminFaqs({ signal }) });
-  const state: LoadState<AdminFaqItem> = faqsQuery.isPending && !faqsQuery.data ? { status: "loading" } : faqsQuery.isError && !faqsQuery.data ? { status: "error", message: faqsQuery.error.message } : { status: "success", items: faqsQuery.data ?? [] };
+  const state = getCachedQueryListState({ data: faqsQuery.data, isPending: faqsQuery.isPending, isError: faqsQuery.isError, errorMessage: faqsQuery.error?.message });
   const [preferredId, setPreferredId] = useState<string>();
   const [selectionInitialized, setSelectionInitialized] = useState(false);
   const [mode, setMode] = useState<EditorMode>({ type: "create" });
   const [value, setValue] = useState<FaqFormValues>({ ...emptyFaqForm });
+  const formBaseline = useRef<FaqFormValues | null>(null);
+  const formItemId = useRef<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string[]>>({});
   const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-  useEffect(() => { if (!faqsQuery.data || (!preferredId && selectionInitialized)) return; queueMicrotask(() => { const selected = faqsQuery.data!.find((item) => item.id === preferredId) ?? faqsQuery.data![0]; if (selected) { setMode({ type: "edit", id: selected.id }); setValue(faqToFormValues(selected)); } else { setMode({ type: "create" }); setValue({ ...emptyFaqForm }); } setSelectionInitialized(true); }); }, [faqsQuery.data, preferredId, selectionInitialized]);
-  const select = (item: AdminFaqItem) => { setMode({ type: "edit", id: item.id }); setValue(faqToFormValues(item)); setErrors({}); setMessage(null); };
-  const create = () => { setMode({ type: "create" }); setValue({ ...emptyFaqForm }); setErrors({}); setMessage(null); };
+  useEffect(() => {
+    if (!faqsQuery.data) return;
+    const selectedId = preferredId ?? (mode.type === "edit" ? mode.id : undefined);
+    if (!selectedId && selectionInitialized) return;
+    queueMicrotask(() => {
+      const selected = (selectedId ? faqsQuery.data!.find((item) => item.id === selectedId) : undefined)
+        ?? (!selectedId ? faqsQuery.data![0] : undefined);
+      if (!selected) return;
+      const incoming = faqToFormValues(selected);
+      if (mode.type !== "edit" || mode.id !== selected.id) setMode({ type: "edit", id: selected.id });
+      const synced = syncEditableFormState({ currentId: formItemId.current, incomingId: selected.id, current: value, baseline: formBaseline.current, incoming });
+      formItemId.current = selected.id;
+      formBaseline.current = synced.baseline;
+      if (!areEditableFormValuesEqual(value, synced.values)) setValue(synced.values);
+      setSelectionInitialized(true);
+    });
+  }, [faqsQuery.data, preferredId, selectionInitialized, mode, value]);
+  const select = (item: AdminFaqItem) => { const incoming = faqToFormValues(item); setPreferredId(undefined); setMode({ type: "edit", id: item.id }); formItemId.current = item.id; formBaseline.current = incoming; setValue(incoming); setErrors({}); setMessage(null); };
+  const create = () => { setPreferredId(undefined); setMode({ type: "create" }); setValue({ ...emptyFaqForm }); formItemId.current = null; formBaseline.current = { ...emptyFaqForm }; setErrors({}); setMessage(null); };
   async function save() {
     setSaving(true); setErrors({}); setMessage(null); const editing = mode.type === "edit";
     try {
@@ -133,6 +170,7 @@ function FaqManager() {
 
 function ContentList<T>({ state, selectedId, label, getId, render, onSelect, onRefresh, onCreate, saving }: Readonly<{ state: LoadState<T>; selectedId: string | null; label: string; getId: (item: T) => string; render: (item: T) => React.ReactNode; onSelect: (item: T) => void; onRefresh: () => void; onCreate: () => void; saving: boolean }>) {
   return <aside className="border-b border-[#e8ebe5] xl:border-r xl:border-b-0"><div className="flex flex-wrap gap-2 border-b border-[#e8ebe5] p-4"><Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={state.status === "loading" || saving}><RefreshCw aria-hidden className={state.status === "loading" ? "animate-spin" : ""} />새로고침</Button><Button type="button" size="sm" onClick={onCreate} disabled={saving}><FilePlus2 aria-hidden />새 {label}</Button></div>
+    {state.status === "success" && state.warning ? <div role="alert" className="border-b border-[#f2d5a7] bg-[#fff8e8] px-4 py-3 text-sm text-[#744b00]">{state.warning}</div> : null}
     {state.status === "loading" ? <div role="status" className="flex min-h-64 items-center justify-center gap-2 p-5 text-sm text-[#617068]"><Loader2 aria-hidden className="size-5 animate-spin" />목록을 불러오는 중입니다.</div> : state.status === "error" ? <div role="alert" className="flex min-h-64 flex-col items-center justify-center p-5 text-center"><AlertCircle aria-hidden className="size-7 text-[#b42318]" /><p className="mt-3 text-sm text-[#912018]">{state.message}</p>{state.message.startsWith("관리자 로그인이") ? <AdminLoginLink className="mt-3 text-sm font-semibold underline">로그인하기</AdminLoginLink> : null}</div> : state.items.length === 0 ? <div className="flex min-h-64 flex-col items-center justify-center p-5 text-center"><BookOpenText aria-hidden className="size-7 text-[#8a968d]" /><p className="mt-3 text-sm text-[#617068]">등록된 {label}가 없습니다.</p></div> : <ul className="max-h-[42rem] overflow-y-auto p-3">{state.items.map((item) => { const id = getId(item); return <li key={id}><button type="button" onClick={() => onSelect(item)} aria-pressed={selectedId === id} className={`w-full rounded-md p-3 text-left outline-none focus-visible:ring-3 focus-visible:ring-[#2e6f4f]/25 ${selectedId === id ? "bg-[#eaf3ed] text-[#23583f]" : "hover:bg-[#f5f6f3]"}`}>{render(item)}</button></li>; })}</ul>}
   </aside>;
 }
