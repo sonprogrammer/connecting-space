@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { resetAdminWorkItemsCache } from "@/entities/admin-work-item/model/reset-query-cache";
 import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, RefreshCw, Search } from "lucide-react";
 
 import type { AdminCustomerDetail, AdminCustomerListItem } from "@/entities/customer";
@@ -88,8 +89,8 @@ export function AdminCustomerProjectManager({
   };
   const selectCustomer = (item: AdminCustomerListItem) => { setSelectedCustomerId(item.id); setTab("customers"); };
   const selectProject = (item: AdminProjectListItem) => { setSelectedProjectId(item.id); setTab("projects"); };
-  const saveCustomer = (item: AdminCustomerDetail) => { queryClient.setQueryData(customerProjectQueryKeys.customers.detail(item.id), item); setCustomerNotice({ id: item.id, message: "고객 정보를 저장했습니다." }); void queryClient.invalidateQueries({ queryKey: customerProjectQueryKeys.customers.lists() }); };
-  const saveProject = (item: AdminProjectDetail) => { queryClient.setQueryData(customerProjectQueryKeys.projects.detail(item.id), item); setProjectNotice({ id: item.id, message: "프로젝트 정보를 저장했습니다." }); void queryClient.invalidateQueries({ queryKey: customerProjectQueryKeys.projects.lists() }); };
+  const saveCustomer = (item: AdminCustomerDetail) => { queryClient.setQueryData(customerProjectQueryKeys.customers.detail(item.id), item); setCustomerNotice({ id: item.id, message: "고객 정보를 저장했습니다." }); void queryClient.invalidateQueries({ queryKey: customerProjectQueryKeys.customers.lists() }); void resetAdminWorkItemsCache(queryClient); };
+  const saveProject = (item: AdminProjectDetail) => { queryClient.setQueryData(customerProjectQueryKeys.projects.detail(item.id), item); setProjectNotice({ id: item.id, message: "프로젝트 정보를 저장했습니다." }); void queryClient.invalidateQueries({ queryKey: customerProjectQueryKeys.projects.lists() }); void resetAdminWorkItemsCache(queryClient); };
   return (
     <section className="overflow-hidden rounded-lg border border-[#dfe3dc] bg-white">
       <div className="flex flex-col gap-4 border-b border-[#e8ebe5] p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -109,20 +110,20 @@ function queryErrorMessage(error: unknown, entity: string) {
   return getAdminQueryWarning(error, entity);
 }
 
-function toCustomerQueryState(query: { data?: { items: AdminCustomerListItem[]; page: number; totalPages: number }; isPending: boolean; isError: boolean; error?: unknown }): AdminCustomerListState {
+function toCustomerQueryState(query: { data?: { items: AdminCustomerListItem[]; page: number; totalPages: number; total: number }; isPending: boolean; isError: boolean; error?: unknown }): AdminCustomerListState {
   return toListState(query, "고객") as AdminCustomerListState;
 }
 
-function toProjectQueryState(query: { data?: { items: AdminProjectListItem[]; page: number; totalPages: number }; isPending: boolean; isError: boolean; error?: unknown }): AdminProjectListState {
+function toProjectQueryState(query: { data?: { items: AdminProjectListItem[]; page: number; totalPages: number; total: number }; isPending: boolean; isError: boolean; error?: unknown }): AdminProjectListState {
   return toListState(query, "프로젝트") as AdminProjectListState;
 }
 
-export function toListState<T extends { items: unknown[]; page: number; totalPages: number }>(query: { data?: T; isPending: boolean; isError: boolean; error?: unknown }, entity: string): AdminCustomerListState | AdminProjectListState {
+export function toListState<T extends { items: unknown[]; page: number; totalPages: number; total: number }>(query: { data?: T; isPending: boolean; isError: boolean; error?: unknown }, entity: string): AdminCustomerListState | AdminProjectListState {
   if (query.isPending && !query.data) return { status: "loading" };
   if (query.isError && !query.data) return { status: "error", message: queryErrorMessage(query.error, entity) };
   const warning = getCachedQueryWarning(Boolean(query.data), query.isError, query.error, entity);
-  if (!query.data || query.data.items.length === 0) return { status: "empty", page: query.data?.page ?? 1, totalPages: query.data?.totalPages ?? 0, warning };
-  return { status: "success", items: query.data.items as AdminCustomerListItem[] & AdminProjectListItem[], page: query.data.page, totalPages: query.data.totalPages, warning };
+  if (!query.data || query.data.items.length === 0) return { status: "empty", page: query.data?.page ?? 1, totalPages: query.data?.totalPages ?? 0, total: query.data?.total ?? 0, warning };
+  return { status: "success", items: query.data.items as AdminCustomerListItem[] & AdminProjectListItem[], page: query.data.page, totalPages: query.data.totalPages, total: query.data.total, warning };
 }
 
 export function toDetailState<T>(query: { data?: T; isPending: boolean; isError: boolean; error?: unknown }, id: string | null, notice?: string, retry?: () => void): DetailState<T> {
@@ -159,7 +160,7 @@ function ListPane({ state, selectedId, onSelect, setPage, onPage, onRetry, kind 
   if (state.status === "loading") return <div className="flex min-h-64 items-center justify-center gap-2 border-b border-[#e8ebe5] p-6 text-sm text-[#617068] xl:border-r xl:border-b-0"><Loader2 aria-hidden className="size-5 animate-spin text-[#2e6f4f]" />목록을 불러오는 중입니다.</div>;
   if (state.status === "error") return <div className="flex min-h-64 flex-col items-center justify-center border-b border-[#e8ebe5] p-6 text-center xl:border-r xl:border-b-0"><AlertCircle aria-hidden className="size-8 text-[#b42318]" /><p className="mt-3 font-medium text-[#912018]">목록을 불러오지 못했습니다</p><p className="mt-2 text-sm text-[#617068]">{state.message}</p><Button type="button" variant="outline" size="sm" className="mt-4" onClick={onRetry}>다시 시도</Button></div>;
   if (state.status === "empty") return <div className="min-h-64 border-b border-[#e8ebe5] text-center text-sm text-[#617068] xl:border-r xl:border-b-0">{state.warning ? <QueryWarning message={state.warning} onRetry={onRetry} /> : null}<p className="p-8">조건에 맞는 {kind === "customer" ? "고객" : "프로젝트"}가 없습니다.</p></div>;
-  return <div className="border-b border-[#e8ebe5] xl:border-r xl:border-b-0">{state.warning ? <QueryWarning message={state.warning} onRetry={onRetry} /> : null}<div className="max-h-[40rem] divide-y divide-[#edf0ea] overflow-y-auto">{state.items.map((item) => { const selected = item.id === selectedId; const project = kind === "project" ? item as AdminProjectListItem : undefined; const customer = kind === "customer" ? item as AdminCustomerListItem : undefined; return <button key={item.id} type="button" aria-current={selected ? "true" : undefined} onClick={() => onSelect(item)} className={`w-full px-5 py-4 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#2e6f4f] ${selected ? "bg-[#edf4ef]" : "hover:bg-[#f7f8f5]"}`}><span className="block font-semibold">{item.name}</span><span className="mt-1 block text-xs text-[#617068]">{customer?.company_name || customer?.email || (project ? projectStatusLabels[project.status] : "연결 정보 없음")}</span>{project?.contract_amount != null ? <span className="mt-1 block text-xs text-[#617068]">계약금 {project.contract_amount.toLocaleString()}원</span> : null}</button>; })}</div><Pagination page={state.page} totalPages={state.totalPages} setPage={setPage} onPage={onPage} /></div>;
+  return <div className="border-b border-[#e8ebe5] xl:border-r xl:border-b-0">{state.warning ? <QueryWarning message={state.warning} onRetry={onRetry} /> : null}<p className="px-5 pt-3 text-xs text-[#617068]">현재 {state.items.length}건 · 전체 {state.total}건</p><div className="max-h-[40rem] divide-y divide-[#edf0ea] overflow-y-auto">{state.items.map((item) => { const selected = item.id === selectedId; const project = kind === "project" ? item as AdminProjectListItem : undefined; const customer = kind === "customer" ? item as AdminCustomerListItem : undefined; return <button key={item.id} type="button" aria-current={selected ? "true" : undefined} onClick={() => onSelect(item)} className={`w-full px-5 py-4 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#2e6f4f] ${selected ? "bg-[#edf4ef]" : "hover:bg-[#f7f8f5]"}`}><span className="block font-semibold">{item.name}</span><span className="mt-1 block text-xs text-[#617068]">{customer?.company_name || customer?.email || (project ? projectStatusLabels[project.status] : "연결 정보 없음")}</span>{project?.contract_amount != null ? <span className="mt-1 block text-xs text-[#617068]">계약금 {project.contract_amount.toLocaleString()}원</span> : null}</button>; })}</div><Pagination page={state.page} totalPages={state.totalPages} setPage={setPage} onPage={onPage} /></div>;
 }
 
 function QueryWarning({ message, onRetry }: Readonly<{ message: string; onRetry: () => void }>) {

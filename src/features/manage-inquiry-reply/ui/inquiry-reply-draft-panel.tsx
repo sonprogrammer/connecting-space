@@ -1,15 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, Bot, Check, Clipboard, Loader2, RefreshCw, RotateCcw, Save, Send, TriangleAlert } from "lucide-react";
 
 import type { InquiryReplyDraft } from "@/entities/automation";
 import type { ApiResponse } from "@/shared/types/api";
 import { Button } from "@/shared/ui/button";
 import { AdminLoginLink } from "@/shared/ui/admin-login-link";
+import { redirectToAdminLogin } from "@/shared/lib/auth/admin-login-redirect";
 import { getDraftStatusCopy, getReplyDraftFailure, getSlackDeliveryPresentation, markReplyDraftRegenerationPending, type DraftViewStatus } from "../model/reply-draft-state";
 import { ReplyDraftGenerationJobStatus } from "./reply-draft-generation-job-status";
 import { ReplyDraftGenerationMetadata } from "./reply-draft-generation-metadata";
+import { adminReplyDraftQueryKeys, fetchAdminReplyDraft, ReplyDraftQueryError } from "../model/reply-draft-queries";
+import { emptyReplyDraftFormState, syncReplyDraftFormState } from "../model/reply-draft-form-state";
+import { adminInquiryQueryKeys } from "@/entities/inquiry/model/admin-inquiry-query-keys";
+import { resetAdminWorkItemsCache } from "@/entities/admin-work-item/model/reset-query-cache";
 
 type ViewState =
   | { status: "loading" }
@@ -19,24 +25,29 @@ type ViewState =
   | { status: "error"; message: string };
 
 export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: string }>) {
-  const [state, setState] = useState<ViewState>({ status: "loading" });
-  const [summary, setSummary] = useState("");
-  const [draftText, setDraftText] = useState("");
+  const queryClient = useQueryClient();
+  const draftQuery = useQuery({ queryKey: adminReplyDraftQueryKeys.detail(inquiryId), queryFn: ({ signal }) => fetchAdminReplyDraft(inquiryId, signal) });
+  const state: ViewState = draftQuery.isPending && !draftQuery.data ? { status: "loading" } : draftQuery.isError && !draftQuery.data
+    ? draftQuery.error instanceof ReplyDraftQueryError && draftQuery.error.status === 404 && draftQuery.error.code === "REPLY_DRAFT_NOT_FOUND"
+      ? { status: "missing" }
+      : { status: "error", message: draftQuery.error instanceof ReplyDraftQueryError && [401, 403].includes(draftQuery.error.status) ? "관리자 로그인이 만료되었습니다. 다시 로그인해 주세요." : draftQuery.error.message }
+    : draftQuery.data?.status === "generating" ? { status: "generating" }
+      : draftQuery.data ? { status: "success", draft: draftQuery.data } : { status: "missing" };
+  const [formState, setFormState] = useState(emptyReplyDraftFormState);
+  const { summary, draft: draftText } = formState;
   const [busy, setBusy] = useState<"save" | "regenerate" | "slack" | null>(null);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
-  const load = useCallback(async () => {
-    setState({ status: "loading" }); setNotice(null);
-    try {
-      const response = await fetch(`/api/admin/inquiries/${inquiryId}/reply-draft`, { cache: "no-store", headers: { Accept: "application/json" } });
-      const result = await response.json() as ApiResponse<InquiryReplyDraft>;
-      if (response.status === 404 && "error" in result && result.error.code === "REPLY_DRAFT_NOT_FOUND") { setState({ status: "missing" }); return; }
-      if (!response.ok || "error" in result) { setState({ status: "error", message: "error" in result ? getReplyDraftFailure(response.status, result) : "AI 초안을 불러오지 못했습니다." }); return; }
-      setState({ status: "success", draft: result.data }); setSummary(result.data.summary); setDraftText(result.data.draft);
-    } catch { setState({ status: "error", message: "네트워크 문제로 AI 초안을 불러오지 못했습니다." }); }
-  }, [inquiryId]);
-
-  useEffect(() => { queueMicrotask(() => void load()); }, [load]);
+  const load = () => { setNotice(null); void draftQuery.refetch(); };
+  useEffect(() => { if (draftQuery.error instanceof ReplyDraftQueryError && [401, 403].includes(draftQuery.error.status)) redirectToAdminLogin(); }, [draftQuery.error]);
+  useEffect(() => {
+    if (!draftQuery.data) return;
+    queueMicrotask(() => setFormState((current) => syncReplyDraftFormState(current, {
+      inquiryId,
+      summary: draftQuery.data!.summary,
+      draft: draftQuery.data!.draft,
+    })));
+  }, [draftQuery.data, draftQuery.dataUpdatedAt, inquiryId]);
 
   async function requestAction(kind: "regenerate" | "slack") {
     setBusy(kind); setNotice(null);
@@ -47,9 +58,12 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
       if (!response.ok || "error" in result) { setNotice({ tone: "error", text: "error" in result ? getReplyDraftFailure(response.status, result) : "요청을 처리하지 못했습니다." }); return; }
       if (kind === "regenerate") {
         setNotice({ tone: "success", text: "AI 초안 재생성을 요청했습니다." });
-        setState((current) => current.status === "success" ? { status: "success", draft: markReplyDraftRegenerationPending(current.draft) } : { status: "generating" });
+        queryClient.setQueryData<InquiryReplyDraft>(adminReplyDraftQueryKeys.detail(inquiryId), (current) => current ? markReplyDraftRegenerationPending(current) : current);
+        void queryClient.invalidateQueries({ queryKey: adminReplyDraftQueryKeys.detail(inquiryId) });
+        void resetAdminWorkItemsCache(queryClient);
       } else {
-        await load();
+        await draftQuery.refetch();
+        await resetAdminWorkItemsCache(queryClient);
         setNotice({ tone: "success", text: "Slack 재전송을 요청했습니다." });
       }
     } catch { setNotice({ tone: "error", text: "네트워크 문제로 요청을 처리하지 못했습니다." }); }
@@ -63,7 +77,10 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
       const response = await fetch(`/api/admin/inquiries/${inquiryId}/reply-draft`, { method: "PATCH", headers: { Accept: "application/json", "Content-Type": "application/json" }, body: JSON.stringify({ summary, draft: draftText }) });
       const result = await response.json() as ApiResponse<{ id: string; updatedAt: string }>;
       if (!response.ok || "error" in result) { setNotice({ tone: "error", text: "error" in result ? getReplyDraftFailure(response.status, result) : "답변 초안을 저장하지 못했습니다." }); return; }
-      setState({ status: "success", draft: { ...state.draft, summary, draft: draftText, updatedAt: result.data.updatedAt } });
+      const updatedDraft = { ...state.draft, summary, draft: draftText, updatedAt: result.data.updatedAt };
+      queryClient.setQueryData(adminReplyDraftQueryKeys.detail(inquiryId), updatedDraft);
+      void queryClient.invalidateQueries({ queryKey: adminInquiryQueryKeys.all });
+      void resetAdminWorkItemsCache(queryClient);
       setNotice({ tone: "success", text: "답변 초안을 저장했습니다." });
     } catch { setNotice({ tone: "error", text: "네트워크 문제로 답변 초안을 저장하지 못했습니다." }); }
     finally { setBusy(null); }
@@ -86,6 +103,7 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
   return <Panel>
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-sm font-semibold text-[#2e6f4f]">AI & Slack</p><h3 className="mt-1 text-lg font-semibold">{status.title}</h3><p className="mt-1 text-sm leading-6 text-[#617068]">{status.description}</p></div><Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={busy !== null}><RefreshCw aria-hidden />상태 새로고침</Button></div>
     {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
+    {draftQuery.isError && draftQuery.data ? <div role="alert" className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#f2d5a7] bg-[#fff8e8] p-3 text-sm text-[#744b00]"><span>최신 답변 초안을 불러오지 못했습니다. 현재 표시된 데이터는 이전 조회 결과입니다.</span><Button type="button" variant="outline" size="sm" onClick={() => void load()} disabled={busy !== null}><RefreshCw aria-hidden />다시 시도</Button></div> : null}
     {!draft.generationJob && draft.status === "generating" ? <div role="status" className="mt-5 flex items-center gap-3 rounded-md bg-[#fff8e6] p-4 text-sm text-[#72551b]"><Loader2 aria-hidden className="size-5 animate-spin" />생성 작업이 진행 중입니다. 잠시 후 상태를 새로고침해 주세요.</div> : null}
     {!draft.generationJob && draft.status === "failed" ? <div role="alert" className="mt-5 rounded-md bg-[#fff1ee] p-4 text-sm text-[#912018]"><div className="flex gap-2"><AlertCircle aria-hidden className="mt-0.5 size-4 shrink-0" /><span>{draft.lastError || "AI 초안 생성 중 오류가 발생했습니다."}</span></div><Button type="button" variant="outline" className="mt-4" onClick={() => void requestAction("regenerate")} disabled={busy !== null}>{busy === "regenerate" ? <Loader2 aria-hidden className="animate-spin" /> : <RotateCcw aria-hidden />}다시 생성</Button></div> : null}
     <ReplyDraftGenerationJobStatus
@@ -93,9 +111,9 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
       action={<Button type="button" variant="outline" onClick={() => void requestAction("regenerate")} disabled={busy !== null}>{busy === "regenerate" ? <Loader2 aria-hidden className="animate-spin" /> : <RotateCcw aria-hidden />}다시 생성</Button>}
     />
     {editable ? <div className="mt-5 grid gap-4">
-      <label className="grid gap-2 text-sm font-semibold text-[#526057]">문의 요약<textarea value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={2000} rows={4} disabled={busy !== null} className="resize-y rounded-md border border-[#dfe3dc] px-3 py-2 font-normal leading-6 text-[#17201a] outline-none focus:border-[#2e6f4f] focus:ring-3 focus:ring-[#2e6f4f]/15" /></label>
+      <label className="grid gap-2 text-sm font-semibold text-[#526057]">문의 요약<textarea value={summary} onChange={(event) => setFormState((current) => ({ ...current, summary: event.target.value }))} maxLength={2000} rows={4} disabled={busy !== null} className="resize-y rounded-md border border-[#dfe3dc] px-3 py-2 font-normal leading-6 text-[#17201a] outline-none focus:border-[#2e6f4f] focus:ring-3 focus:ring-[#2e6f4f]/15" /></label>
       {draft.needsConfirmation.length > 0 ? <div className="rounded-md border border-[#ead7aa] bg-[#fffbf1] p-4"><h4 className="flex items-center gap-2 text-sm font-semibold text-[#72551b]"><TriangleAlert aria-hidden className="size-4" />고객 확인 필요</h4><ul className="mt-3 space-y-3">{draft.needsConfirmation.map((item, index) => <li key={`${item.topic}-${index}`} className="text-sm leading-6"><strong>{item.topic}</strong><p className="text-[#6a6252]">{item.reason}</p><p className="mt-1 text-[#72551b]">질문 제안: {item.suggestedQuestion}</p></li>)}</ul></div> : null}
-      <label className="grid gap-2 text-sm font-semibold text-[#526057]">답변 초안<textarea value={draftText} onChange={(event) => setDraftText(event.target.value)} maxLength={12000} rows={12} required disabled={busy !== null} className="resize-y rounded-md border border-[#dfe3dc] px-3 py-2 font-normal leading-6 text-[#17201a] outline-none focus:border-[#2e6f4f] focus:ring-3 focus:ring-[#2e6f4f]/15" /></label>
+      <label className="grid gap-2 text-sm font-semibold text-[#526057]">답변 초안<textarea value={draftText} onChange={(event) => setFormState((current) => ({ ...current, draft: event.target.value }))} maxLength={12000} rows={12} required disabled={busy !== null} className="resize-y rounded-md border border-[#dfe3dc] px-3 py-2 font-normal leading-6 text-[#17201a] outline-none focus:border-[#2e6f4f] focus:ring-3 focus:ring-[#2e6f4f]/15" /></label>
       <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={() => void requestAction("regenerate")} disabled={busy !== null}>{busy === "regenerate" ? <Loader2 aria-hidden className="animate-spin" /> : <RotateCcw aria-hidden />}재생성</Button><Button type="button" variant="outline" onClick={() => void copyDraft()} disabled={busy !== null || !draftText}><Clipboard aria-hidden />복사</Button><Button type="button" onClick={() => void save()} disabled={busy !== null || !draftText.trim()}>{busy === "save" ? <Loader2 aria-hidden className="animate-spin" /> : <Save aria-hidden />}초안 저장</Button></div>
     </div> : null}
     <div className="mt-5 grid gap-3 rounded-md border border-[#e8ebe5] bg-[#fbfcf9] p-4 text-xs text-[#617068] sm:grid-cols-2 xl:grid-cols-5"><p>마지막 갱신: <strong className="text-[#3c4941]">{formatDateTime(draft.updatedAt)}</strong></p><p>생성 기록: <strong className="break-all text-[#3c4941]">{draft.generationRecordId || "기록 없음"}</strong></p><ReplyDraftGenerationMetadata generationRecord={draft.generationRecord} /></div>

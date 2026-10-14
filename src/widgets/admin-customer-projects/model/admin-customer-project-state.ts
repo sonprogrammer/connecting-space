@@ -12,14 +12,14 @@ import type { ApiFailure, ApiResponse } from "@/shared/types/api";
 
 export type AdminCustomerListState =
   | { status: "loading" }
-  | { status: "success"; items: AdminCustomerListItem[]; page: number; totalPages: number; warning?: string }
-  | { status: "empty"; page: number; totalPages: number; warning?: string }
+  | { status: "success"; items: AdminCustomerListItem[]; page: number; totalPages: number; total: number; warning?: string }
+  | { status: "empty"; page: number; totalPages: number; total: number; warning?: string }
   | { status: "error"; message: string };
 
 export type AdminProjectListState =
   | { status: "loading" }
-  | { status: "success"; items: AdminProjectListItem[]; page: number; totalPages: number; warning?: string }
-  | { status: "empty"; page: number; totalPages: number; warning?: string }
+  | { status: "success"; items: AdminProjectListItem[]; page: number; totalPages: number; total: number; warning?: string }
+  | { status: "empty"; page: number; totalPages: number; total: number; warning?: string }
   | { status: "error"; message: string };
 
 export type CustomerFormValues = {
@@ -181,23 +181,23 @@ function listError(status: number | undefined, entity: string) {
 }
 
 export function toCustomerListState(
-  result: ApiResponse<{ items: AdminCustomerListItem[]; page: number; totalPages: number }>,
+  result: ApiResponse<{ items: AdminCustomerListItem[]; page: number; totalPages: number; total: number }>,
   status?: number,
 ): AdminCustomerListState {
   if ("error" in result) return { status: "error", message: listError(status, "고객") };
   return result.data.items.length === 0
-    ? { status: "empty", page: result.data.page, totalPages: result.data.totalPages }
-    : { status: "success", items: result.data.items, page: result.data.page, totalPages: result.data.totalPages };
+    ? { status: "empty", page: result.data.page, totalPages: result.data.totalPages, total: result.data.total }
+    : { status: "success", items: result.data.items, page: result.data.page, totalPages: result.data.totalPages, total: result.data.total };
 }
 
 export function toProjectListState(
-  result: ApiResponse<{ items: AdminProjectListItem[]; page: number; totalPages: number }>,
+  result: ApiResponse<{ items: AdminProjectListItem[]; page: number; totalPages: number; total: number }>,
   status?: number,
 ): AdminProjectListState {
   if ("error" in result) return { status: "error", message: listError(status, "프로젝트") };
   return result.data.items.length === 0
-    ? { status: "empty", page: result.data.page, totalPages: result.data.totalPages }
-    : { status: "success", items: result.data.items, page: result.data.page, totalPages: result.data.totalPages };
+    ? { status: "empty", page: result.data.page, totalPages: result.data.totalPages, total: result.data.total }
+    : { status: "success", items: result.data.items, page: result.data.page, totalPages: result.data.totalPages, total: result.data.total };
 }
 
 export function getSaveFailure(status: number, result: ApiFailure, entity: string) {

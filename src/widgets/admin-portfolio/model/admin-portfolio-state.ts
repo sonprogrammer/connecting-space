@@ -1,10 +1,8 @@
 import type { AdminPortfolioListItem } from "@/entities/portfolio";
 import type { ApiFailure, ApiResponse } from "@/shared/types/api";
+import type { AdminQueryListState } from "@/shared/lib/admin-editable-query-state";
 
-export type AdminPortfolioListState =
-  | { status: "loading" }
-  | { status: "success"; items: AdminPortfolioListItem[] }
-  | { status: "error"; message: string };
+export type AdminPortfolioListState = AdminQueryListState<AdminPortfolioListItem>;
 
 export type PortfolioSaveFailure = {
   fieldErrors: Record<string, string[]>;

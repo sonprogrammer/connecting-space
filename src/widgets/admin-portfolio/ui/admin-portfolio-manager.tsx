@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   CheckCircle2,
@@ -24,84 +25,86 @@ import {
 import type { ApiResponse } from "@/shared/types/api";
 import { AdminLoginLink } from "@/shared/ui/admin-login-link";
 import { Button } from "@/shared/ui/button";
+import { areEditableFormValuesEqual, getCachedQueryListState, syncEditableFormState } from "@/shared/lib/admin-editable-query-state";
 
 import {
   getPortfolioSaveFailure,
-  toAdminPortfolioListState,
   type AdminPortfolioListState,
 } from "../model/admin-portfolio-state";
+import { adminPortfolioQueryKeys, fetchAdminPortfolioList } from "../model/admin-portfolio-queries";
 
 type EditorMode =
   | { type: "create" }
   | { type: "edit"; portfolioId: string };
 
 export function AdminPortfolioManager() {
-  const [listState, setListState] = useState<AdminPortfolioListState>({
-    status: "loading",
+  const queryClient = useQueryClient();
+  const portfolioQuery = useQuery({ queryKey: adminPortfolioQueryKeys.list(), queryFn: ({ signal }) => fetchAdminPortfolioList({ signal }) });
+  const [preferredId, setPreferredId] = useState<string>();
+  const [selectionInitialized, setSelectionInitialized] = useState(false);
+  const listState: AdminPortfolioListState = getCachedQueryListState({
+    data: portfolioQuery.data,
+    isPending: portfolioQuery.isPending,
+    isError: portfolioQuery.isError,
+    errorMessage: portfolioQuery.error?.message,
   });
   const [editorMode, setEditorMode] = useState<EditorMode>({ type: "create" });
   const [formValues, setFormValues] = useState<PortfolioFormValues>({
     ...emptyPortfolioForm,
   });
+  const formBaseline = useRef<PortfolioFormValues | null>(null);
+  const formItemId = useRef<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const loadPortfolio = useCallback(async (preferredId?: string) => {
-    try {
-      const response = await fetch("/api/admin/portfolio", {
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      });
-      const result = (await response.json()) as ApiResponse<AdminPortfolioListItem[]>;
-
-      if (!response.ok || "error" in result) {
-        setListState(
-          "error" in result
-            ? toAdminPortfolioListState(result, response.status)
-            : { status: "error", message: "포트폴리오 목록을 불러오지 못했습니다." },
-        );
-        return;
-      }
-
-      setListState(toAdminPortfolioListState(result));
-
-      const selected =
-        result.data.find((item) => item.id === preferredId) ?? result.data[0];
-
-      if (selected) {
-        setEditorMode({ type: "edit", portfolioId: selected.id });
-        setFormValues(portfolioToFormValues(selected));
-      } else {
-        setEditorMode({ type: "create" });
-        setFormValues({ ...emptyPortfolioForm });
-      }
-    } catch {
-      setListState({
-        status: "error",
-        message: "네트워크 문제로 포트폴리오 목록을 불러오지 못했습니다.",
-      });
-    }
-  }, []);
-
   useEffect(() => {
+    if (!portfolioQuery.data) return;
+    const selectedId = preferredId ?? (editorMode.type === "edit" ? editorMode.portfolioId : undefined);
+    if (!selectedId && selectionInitialized) return;
     queueMicrotask(() => {
-      void loadPortfolio();
+      const selected = (selectedId ? portfolioQuery.data!.find((item) => item.id === selectedId) : undefined)
+        ?? (!selectedId ? portfolioQuery.data![0] : undefined);
+      if (selected) {
+        const incoming = portfolioToFormValues(selected);
+        if (editorMode.type !== "edit" || editorMode.portfolioId !== selected.id) {
+          setEditorMode({ type: "edit", portfolioId: selected.id });
+        }
+        const synced = syncEditableFormState({ currentId: formItemId.current, incomingId: selected.id, current: formValues, baseline: formBaseline.current, incoming });
+        formItemId.current = selected.id;
+        formBaseline.current = synced.baseline;
+        if (!areEditableFormValuesEqual(formValues, synced.values)) setFormValues(synced.values);
+      } else {
+        if (editorMode.type !== "create") {
+          setEditorMode({ type: "create" });
+          setFormValues({ ...emptyPortfolioForm });
+          formItemId.current = null;
+          formBaseline.current = { ...emptyPortfolioForm };
+        }
+      }
+      setSelectionInitialized(true);
     });
-  }, [loadPortfolio]);
+  }, [portfolioQuery.data, preferredId, selectionInitialized, editorMode, formValues]);
 
   function selectPortfolio(portfolio: AdminPortfolioListItem) {
+    const incoming = portfolioToFormValues(portfolio);
+    setPreferredId(undefined);
     setEditorMode({ type: "edit", portfolioId: portfolio.id });
-    setFormValues(portfolioToFormValues(portfolio));
+    formItemId.current = portfolio.id;
+    formBaseline.current = incoming;
+    setFormValues(incoming);
     setFieldErrors({});
     setNotice(null);
     setSaveError(null);
   }
 
   function startCreate() {
+    setPreferredId(undefined);
     setEditorMode({ type: "create" });
     setFormValues({ ...emptyPortfolioForm });
+    formItemId.current = null;
+    formBaseline.current = { ...emptyPortfolioForm };
     setFieldErrors({});
     setNotice(null);
     setSaveError(null);
@@ -141,7 +144,8 @@ export function AdminPortfolioManager() {
       }
 
       setNotice(isEditing ? "포트폴리오를 수정했습니다." : "새 포트폴리오를 만들었습니다.");
-      await loadPortfolio(result.data.id);
+      setPreferredId(result.data.id);
+      await queryClient.invalidateQueries({ queryKey: adminPortfolioQueryKeys.list() });
     } catch {
       setSaveError("네트워크 문제로 포트폴리오를 저장하지 못했습니다.");
     } finally {
@@ -150,10 +154,10 @@ export function AdminPortfolioManager() {
   }
 
   function refreshPortfolio() {
-    setListState({ status: "loading" });
     setNotice(null);
     setSaveError(null);
-    void loadPortfolio(editorMode.type === "edit" ? editorMode.portfolioId : undefined);
+    setPreferredId(editorMode.type === "edit" ? editorMode.portfolioId : undefined);
+    void portfolioQuery.refetch();
   }
 
   return (
@@ -166,8 +170,8 @@ export function AdminPortfolioManager() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={refreshPortfolio} disabled={listState.status === "loading" || saving}>
-            {listState.status === "loading" ? (
+          <Button type="button" variant="outline" size="sm" onClick={refreshPortfolio} disabled={portfolioQuery.isFetching || saving}>
+            {portfolioQuery.isFetching ? (
               <Loader2 aria-hidden className="size-4 animate-spin" />
             ) : (
               <RefreshCw aria-hidden className="size-4" />
@@ -272,15 +276,20 @@ function PortfolioList({
 
   if (state.items.length === 0) {
     return (
+      <div>
+      {state.warning ? <div role="alert" className="border-b border-[#f2d5a7] bg-[#fff8e8] px-5 py-3 text-sm text-[#744b00]">{state.warning}</div> : null}
       <div className="flex min-h-64 flex-col items-center justify-center p-6 text-center">
         <FolderOpen aria-hidden className="size-8 text-[#8a968d]" />
         <p className="mt-3 font-medium">등록된 포트폴리오가 없습니다</p>
         <p className="mt-2 text-sm text-[#617068]">오른쪽 폼에서 첫 작업 사례를 만들어 보세요.</p>
       </div>
+      </div>
     );
   }
 
   return (
+    <>
+    {state.warning ? <div role="alert" className="border-b border-[#f2d5a7] bg-[#fff8e8] px-5 py-3 text-sm text-[#744b00]">{state.warning}</div> : null}
     <div className="max-h-[48rem] divide-y divide-[#edf0ea] overflow-y-auto">
       {state.items.map((portfolio) => {
         const selected = portfolio.id === selectedId;
@@ -315,5 +324,6 @@ function PortfolioList({
         );
       })}
     </div>
+    </>
   );
 }

@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
+import { InfiniteQueryObserver } from "@tanstack/query-core";
+import { QueryClient } from "@tanstack/react-query";
 
 import * as todayDashboardModel from "../src/widgets/admin-dashboard/model/admin-today-dashboard";
 import { adminWorkItemsResponseSchema, fetchAdminWorkItems, todayDashboardActions } from "../src/widgets/admin-dashboard/model/admin-today-dashboard";
@@ -162,6 +164,148 @@ describe("today dashboard work item contract", () => {
     assert.equal(getStatusLabel({ group: "projectConversion", kind: "convertApprovedQuote", status: "approved", action: "convert_quote" }), "승인 완료");
   });
 });
+
+describe("admin work items query cache", () => {
+  test("separates query keys by group, sort, and page size", () => {
+    const keyFactory = Reflect.get(todayDashboardModel, "adminWorkItemsQueryKeys") as {
+      list: (query: { group: string; sort: string; pageSize: number }) => readonly unknown[];
+    } | undefined;
+    assert.ok(keyFactory);
+    const base = keyFactory.list({ group: "all", sort: "waiting", pageSize: 25 });
+    assert.deepEqual(base, keyFactory.list({ group: "all", sort: "waiting", pageSize: 25 }));
+    assert.notDeepEqual(base, keyFactory.list({ group: "quote", sort: "waiting", pageSize: 25 }));
+    assert.notDeepEqual(base, keyFactory.list({ group: "all", sort: "latest", pageSize: 25 }));
+    assert.notDeepEqual(base, keyFactory.list({ group: "all", sort: "waiting", pageSize: 10 }));
+  });
+
+  test("reuses query A after visiting B within the 30-second stale window", async () => {
+    const createOptions = getWorkItemsQueryOptionsFactory();
+    const requestUrls: string[] = [];
+    const fetcher: typeof fetch = async (input) => {
+      requestUrls.push(String(input));
+      const url = new URL(String(input), "http://localhost");
+      return jsonResponse({
+        data: makeWorkItemsResponse({
+          group: url.searchParams.get("group") ?? "all",
+          sort: url.searchParams.get("sort") ?? "waiting",
+          page: Number(url.searchParams.get("page") ?? 1),
+          items: [],
+          total: 0,
+          hasNextPage: false,
+        }),
+      });
+    };
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: false } } });
+    const queryA = createOptions({ group: "all", sort: "waiting", pageSize: 25 }, fetcher);
+    const queryB = createOptions({ group: "quote", sort: "latest", pageSize: 25 }, fetcher);
+
+    try {
+      await client.fetchInfiniteQuery(queryA as never);
+      await client.fetchInfiniteQuery(queryB as never);
+      await client.fetchInfiniteQuery(queryA as never);
+      assert.equal(requestUrls.length, 2);
+      assert.equal(requestUrls.filter((url) => url.includes("group=all")).length, 1);
+      assert.equal(requestUrls.filter((url) => url.includes("group=quote")).length, 1);
+    } finally {
+      client.clear();
+    }
+  });
+
+  test("keeps one asOf across 51 ordered items and distinguishes total from loaded count", async () => {
+    const createOptions = getWorkItemsQueryOptionsFactory();
+    const requestUrls: string[] = [];
+    const pages = [
+      makeWorkItemsResponse({ group: "quote", sort: "latest", page: 1, items: ids(1, 25).map(makeInquiryItem), total: 51, hasNextPage: true, countsTotal: 90 }),
+      makeWorkItemsResponse({ group: "quote", sort: "latest", page: 2, items: ids(26, 50).map(makeInquiryItem), total: 51, hasNextPage: true, countsTotal: 90 }),
+      makeWorkItemsResponse({ group: "quote", sort: "latest", page: 3, items: ids(51, 51).map(makeInquiryItem), total: 51, hasNextPage: false, countsTotal: 90 }),
+    ];
+    const fetcher: typeof fetch = async (input) => {
+      requestUrls.push(String(input));
+      const url = new URL(String(input), "http://localhost");
+      const page = Number(url.searchParams.get("page"));
+      return jsonResponse({ data: pages[page - 1] });
+    };
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: false } } });
+    const options = createOptions({ group: "quote", sort: "latest", pageSize: 25 }, fetcher);
+    const observer = new InfiniteQueryObserver(client, options as never);
+
+    try {
+      await observer.refetch();
+      await observer.fetchNextPage();
+      const twoPageData = observer.getCurrentResult().data as { pages: typeof pages } | undefined;
+      assert.ok(twoPageData);
+      assert.equal(getWorkItemsCount("getAdminWorkItemsLoadedCount")(twoPageData.pages), 50);
+      assert.equal(getWorkItemsCount("getAdminWorkItemsTotal")(twoPageData.pages.at(-1)), 51);
+      await observer.fetchNextPage();
+      const result = observer.getCurrentResult();
+      const data = result.data as { pages: typeof pages } | undefined;
+      assert.ok(data);
+      const loadedItems = data.pages.flatMap((page) => page.items);
+      assert.equal(loadedItems.length, 51);
+      assert.equal(new Set(loadedItems.map((item) => item.id)).size, 51);
+      assert.deepEqual(loadedItems.map((item) => item.id), ids(1, 51));
+      assert.equal(getWorkItemsCount("getAdminWorkItemsLoadedCount")(data.pages), 51);
+      assert.equal(getWorkItemsCount("getAdminWorkItemsTotal")(data.pages.at(-1)), 51);
+      assert.equal(requestUrls.length, 3);
+      assert.deepEqual(requestUrls.map((url) => new URL(url, "http://localhost").searchParams.get("page")), ["1", "2", "3"]);
+      assert.deepEqual(requestUrls.map((url) => new URL(url, "http://localhost").searchParams.get("asOf")), [null, pages[0]?.asOf, pages[0]?.asOf]);
+      assert.equal(result.hasNextPage, false);
+    } finally {
+      observer.destroy();
+      client.clear();
+    }
+  });
+});
+
+function getWorkItemsQueryOptionsFactory() {
+  const factory = Reflect.get(todayDashboardModel, "adminWorkItemsInfiniteQueryOptions") as (
+    query: { group: string; sort: string; pageSize: number },
+    fetcher?: typeof fetch,
+  ) => object;
+  assert.equal(typeof factory, "function");
+  return factory;
+}
+
+function getWorkItemsCount(name: string) {
+  const helper = Reflect.get(todayDashboardModel, name) as (pages: unknown) => number;
+  assert.equal(typeof helper, "function");
+  return helper;
+}
+
+function ids(start: number, end: number) {
+  return Array.from({ length: end - start + 1 }, (_, index) => `inquiry:${start + index}`);
+}
+
+function makeWorkItemsResponse({
+  group,
+  sort,
+  page,
+  items,
+  total,
+  hasNextPage,
+  countsTotal = total,
+}: {
+  group: string;
+  sort: string;
+  page: number;
+  items: ReturnType<typeof makeInquiryItem>[];
+  total: number;
+  hasNextPage: boolean;
+  countsTotal?: number;
+}) {
+  return {
+    asOf: "2026-10-10T00:00:00.000Z",
+    group,
+    sort,
+    counts: { total: countsTotal, newInquiry: 0, quote: 31, projectConversion: 0, overduePayment: 0 },
+    pagination: { page, pageSize: 25, total, hasNextPage },
+    items,
+  };
+}
+
+function jsonResponse(body: unknown) {
+  return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
+}
 
 function makeInquiryItem(id: string) {
   return {

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { PaymentKind, PaymentRow, PaymentReceiptRow } from "@/entities/payment";
+import { resetAdminWorkItemsCache } from "@/entities/admin-work-item/model/reset-query-cache";
 import { Button } from "@/shared/ui/button";
 import {
   adminProjectPaymentQueryKeys,
@@ -109,7 +110,7 @@ export function ProjectPaymentManager({ projectId }: Props) {
   const [saving, setSaving] = useState(false);
   const [formKey, setFormKey] = useState(0);
   const [newForm, setNewForm] = useState(emptyPaymentForm);
-  const refresh = async (message: string) => { await queryClient.invalidateQueries({ queryKey: adminProjectPaymentQueryKeys.detail(projectId) }); setNotice(message); };
+  const refresh = async (message: string) => { await queryClient.invalidateQueries({ queryKey: adminProjectPaymentQueryKeys.detail(projectId) }); await resetAdminWorkItemsCache(queryClient); setNotice(message); };
   const run = async (action: () => Promise<unknown>, message: string) => { setSaving(true); setError(undefined); setNotice(undefined); try { await action(); await refresh(message); return true; } catch (cause) { setError(paymentErrorMessage(cause)); return false; } finally { setSaving(false); } };
   if (query.isPending) return <section className="mt-7 border-t border-[#e8ebe5] pt-6"><h3 className="text-lg font-semibold">결제·입금 관리</h3><p className="mt-3 text-sm text-[#617068]">결제 정보를 불러오는 중…</p></section>;
   if (query.isError) return <section className="mt-7 border-t border-[#e8ebe5] pt-6"><h3 className="text-lg font-semibold">결제·입금 관리</h3><div role="alert" className="mt-3 rounded-md bg-[#fff8e8] p-3 text-sm text-[#7a4b00]">{paymentErrorMessage(query.error)}<Button type="button" variant="outline" size="xs" className="ml-3" onClick={() => void query.refetch()}>다시 시도</Button></div></section>;

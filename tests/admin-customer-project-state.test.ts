@@ -24,7 +24,7 @@ describe("admin customer/project model", () => {
   });
 
   test("normalizes empty and unauthorized customer lists", () => {
-    assert.deepEqual(toCustomerListState({ data: { items: [], page: 1, totalPages: 0 } }), { status: "empty", page: 1, totalPages: 0 });
+    assert.deepEqual(toCustomerListState({ data: { items: [], page: 1, totalPages: 0, total: 0 } }), { status: "empty", page: 1, totalPages: 0, total: 0 });
     const unauthorized = toCustomerListState({ error: { code: "AUTH", message: "no" } }, 401);
     assert.equal(unauthorized.status, "error");
     if (unauthorized.status === "error") assert.equal(unauthorized.message, "관리자 로그인이 만료되었습니다. 다시 로그인해 주세요.");
