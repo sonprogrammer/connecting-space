@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 
 import { QueryClient } from "@tanstack/query-core";
@@ -49,5 +50,14 @@ describe("admin inquiry query cache", () => {
     } finally {
       globalThis.fetch = previousFetch;
     }
+  });
+
+  test("renders refresh warnings and retry actions for cached list and detail failures", () => {
+    const source = readFileSync("src/widgets/admin-dashboard/ui/admin-inquiry-list.tsx", "utf8");
+    assert.match(source, /getCachedQueryListState\(/);
+    assert.match(source, /getCachedQueryState\(/);
+    assert.match(source, /<QueryRefreshNotice message=\{state\.warning\}/);
+    assert.match(source, /onRetry:\s*\(\)\s*=>\s*void detailQuery\.refetch\(\)/);
+    assert.match(source, /onRetry=\{\(\)\s*=>\s*void inquiriesQuery\.refetch\(\)\}/);
   });
 });

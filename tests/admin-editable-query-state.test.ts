@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 
 import {
+  getCachedQueryState,
   getCachedQueryListState,
   syncEditableFormState,
 } from "../src/shared/lib/admin-editable-query-state";
@@ -52,12 +53,38 @@ describe("admin editable query state", () => {
         warning: "목록을 새로고침하지 못했습니다. 현재 표시된 데이터는 이전 조회 결과입니다.",
       },
     );
+    assert.deepEqual(
+      getCachedQueryListState({ data: [], isPending: false, isError: true }),
+      {
+        status: "success",
+        items: [],
+        warning: "목록을 새로고침하지 못했습니다. 현재 표시된 데이터는 이전 조회 결과입니다.",
+      },
+    );
   });
 
   test("shows an error state when a failed query has no cached rows", () => {
     assert.deepEqual(
       getCachedQueryListState({ data: undefined, isPending: false, isError: true, errorMessage: "failed" }),
       { status: "error", message: "failed" },
+    );
+  });
+
+  test("keeps cached detail data and exposes a retry warning after refetch failure", () => {
+    const cachedDetail = { id: "inquiry-1", status: "new" };
+    assert.deepEqual(
+      getCachedQueryState({
+        data: cachedDetail,
+        isPending: false,
+        isError: true,
+        errorMessage: "network error",
+        warningMessage: "문의 상세를 새로고침하지 못했습니다. 이전 조회 데이터를 표시 중입니다.",
+      }),
+      {
+        status: "success",
+        data: cachedDetail,
+        warning: "문의 상세를 새로고침하지 못했습니다. 이전 조회 데이터를 표시 중입니다.",
+      },
     );
   });
 

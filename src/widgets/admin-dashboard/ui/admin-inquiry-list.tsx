@@ -29,6 +29,7 @@ import { InquiryQuoteSummary } from "@/widgets/admin-inquiry-quotes";
 import { Button } from "@/shared/ui/button";
 import type { ApiResponse } from "@/shared/types/api";
 import { redirectToAdminLogin } from "@/shared/lib/auth/admin-login-redirect";
+import { getCachedQueryListState, getCachedQueryState } from "@/shared/lib/admin-editable-query-state";
 import { InquirySelectionButton } from "./inquiry-selection-button";
 import {
   AdminInquiryQueryError,
@@ -40,15 +41,15 @@ import { resetAdminWorkItemsCache } from "@/entities/admin-work-item/model/reset
 
 type InquiryListState =
   | { status: "loading" }
-  | { status: "success"; inquiries: AdminInquiryListItem[] }
-  | { status: "empty" }
+  | { status: "success"; inquiries: AdminInquiryListItem[]; warning?: string }
+  | { status: "empty"; warning?: string }
   | { status: "error"; message: string };
 
 type DetailState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "success"; inquiry: AdminInquiryDetail; notice?: string }
-  | { status: "error"; message: string };
+  | { status: "success"; inquiry: AdminInquiryDetail; notice?: string; warning?: string; onRetry: () => void; isRefreshing: boolean }
+  | { status: "error"; message: string; onRetry: () => void; isRefreshing: boolean };
 
 const inquiryStatuses: InquiryStatus[] = [
   "new",
@@ -74,23 +75,31 @@ export function AdminInquiryList() {
     enabled: Boolean(selectedInquiryId),
   });
 
-  const inquiries = inquiriesQuery.data ?? [];
-  const state: InquiryListState = inquiriesQuery.isPending && !inquiriesQuery.data
-    ? { status: "loading" }
-    : inquiriesQuery.isError && !inquiriesQuery.data
-      ? { status: "error", message: inquiriesQuery.error.message }
-      : inquiries.length > 0
-        ? { status: "success", inquiries }
-        : { status: "empty" };
+  const listQueryState = getCachedQueryListState({
+    data: inquiriesQuery.data,
+    isPending: inquiriesQuery.isPending,
+    isError: inquiriesQuery.isError,
+    errorMessage: inquiriesQuery.error?.message,
+  });
+  const state: InquiryListState = listQueryState.status === "loading" || listQueryState.status === "error"
+    ? listQueryState
+    : listQueryState.items.length > 0
+      ? { status: "success", inquiries: listQueryState.items, warning: listQueryState.warning }
+      : { status: "empty", warning: listQueryState.warning };
+  const detailQueryState = getCachedQueryState({
+    data: detailQuery.data,
+    isPending: detailQuery.isPending,
+    isError: detailQuery.isError,
+    errorMessage: detailQuery.error?.message,
+    warningMessage: "문의 상세를 새로고침하지 못했습니다. 이전 조회 데이터를 표시 중입니다.",
+  });
   const detailState: DetailState = !selectedInquiryId
     ? { status: "idle" }
-    : detailQuery.isPending && !detailQuery.data
+    : detailQueryState.status === "loading"
       ? { status: "loading" }
-      : detailQuery.isError && !detailQuery.data
-        ? { status: "error", message: detailQuery.error.message }
-        : detailQuery.data
-          ? { status: "success", inquiry: detailQuery.data, notice }
-          : { status: "loading" };
+      : detailQueryState.status === "error"
+        ? { status: "error", message: detailQueryState.message, onRetry: () => void detailQuery.refetch(), isRefreshing: detailQuery.isFetching }
+        : { status: "success", inquiry: detailQueryState.data, notice, warning: detailQueryState.warning, onRetry: () => void detailQuery.refetch(), isRefreshing: detailQuery.isFetching };
 
   useEffect(() => {
     if (
@@ -172,6 +181,8 @@ export function AdminInquiryList() {
           state={state}
           selectedInquiryId={selectedInquiryId}
           onSelectInquiry={setSelectedInquiryId}
+          onRetry={() => void inquiriesQuery.refetch()}
+          isRefreshing={inquiriesQuery.isFetching}
         />
       </div>
 
@@ -187,10 +198,14 @@ function InquiryListContent({
   state,
   selectedInquiryId,
   onSelectInquiry,
+  onRetry,
+  isRefreshing,
 }: Readonly<{
   state: InquiryListState;
   selectedInquiryId: string | null;
   onSelectInquiry: (inquiryId: string) => void;
+  onRetry: () => void;
+  isRefreshing: boolean;
 }>) {
   if (state.status === "loading") {
     return (
@@ -203,12 +218,15 @@ function InquiryListContent({
 
   if (state.status === "empty") {
     return (
-      <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center">
-        <Inbox aria-hidden className="size-8 text-[#8a968d]" />
-        <p className="mt-3 font-medium">등록된 문의가 없습니다</p>
-        <p className="mt-2 text-sm text-[#617068]">
-          공개 문의 폼에서 접수된 문의가 이곳에 표시됩니다.
-        </p>
+      <div>
+        {state.warning ? <QueryRefreshNotice message={state.warning} onRetry={onRetry} isRefreshing={isRefreshing} /> : null}
+        <div className="flex min-h-64 flex-col items-center justify-center p-8 text-center">
+          <Inbox aria-hidden className="size-8 text-[#8a968d]" />
+          <p className="mt-3 font-medium">등록된 문의가 없습니다</p>
+          <p className="mt-2 text-sm text-[#617068]">
+            공개 문의 폼에서 접수된 문의가 이곳에 표시됩니다.
+          </p>
+        </div>
       </div>
     );
   }
@@ -223,52 +241,59 @@ function InquiryListContent({
         <p className="mt-2 max-w-md text-sm leading-6 text-[#617068]">
           {state.message}
         </p>
+        <Button type="button" variant="outline" className="mt-4" onClick={onRetry} disabled={isRefreshing}>
+          {isRefreshing ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <RefreshCw aria-hidden className="size-4" />}
+          다시 시도
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[760px] border-collapse text-left text-sm">
-        <thead className="bg-[#f7f8f5] text-[#617068]">
-          <tr>
-            <ColumnHeader>문의자</ColumnHeader>
-            <ColumnHeader>연락처</ColumnHeader>
-            <ColumnHeader>회사명</ColumnHeader>
-            <ColumnHeader>서비스 유형</ColumnHeader>
-            <ColumnHeader>상태</ColumnHeader>
-            <ColumnHeader>등록일</ColumnHeader>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-[#edf0ea]">
-          {state.inquiries.map((inquiry) => (
-            <tr
-              key={inquiry.id}
-              id={`inquiry-${inquiry.id}`}
-              className={`cursor-pointer align-top transition ${selectedInquiryId === inquiry.id ? "bg-[#edf7f0]" : "hover:bg-[#f7f8f5]"}`}
-              onClick={() => onSelectInquiry(inquiry.id)}
-            >
-              <Cell>
-                <InquirySelectionButton
-                  inquiryId={inquiry.id}
-                  customerName={inquiry.customer_name}
-                  selected={selectedInquiryId === inquiry.id}
-                  onSelect={onSelectInquiry}
-                />
-              </Cell>
-              <Cell>{getInquiryPrimaryContact(inquiry)}</Cell>
-              <Cell>{inquiry.company_name || "회사명 없음"}</Cell>
-              <Cell>{inquiry.service_type}</Cell>
-              <Cell>
-                <span className="inline-flex rounded-md bg-[#eaf3ed] px-2.5 py-1 text-xs font-semibold text-[#23583f]">
-                  {getInquiryStatusLabel(inquiry.status)}
-                </span>
-              </Cell>
-              <Cell>{formatAdminInquiryCreatedAt(inquiry.created_at)}</Cell>
+    <div>
+      {state.warning ? <QueryRefreshNotice message={state.warning} onRetry={onRetry} isRefreshing={isRefreshing} /> : null}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] border-collapse text-left text-sm">
+          <thead className="bg-[#f7f8f5] text-[#617068]">
+            <tr>
+              <ColumnHeader>문의자</ColumnHeader>
+              <ColumnHeader>연락처</ColumnHeader>
+              <ColumnHeader>회사명</ColumnHeader>
+              <ColumnHeader>서비스 유형</ColumnHeader>
+              <ColumnHeader>상태</ColumnHeader>
+              <ColumnHeader>등록일</ColumnHeader>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-[#edf0ea]">
+            {state.inquiries.map((inquiry) => (
+              <tr
+                key={inquiry.id}
+                id={`inquiry-${inquiry.id}`}
+                className={`cursor-pointer align-top transition ${selectedInquiryId === inquiry.id ? "bg-[#edf7f0]" : "hover:bg-[#f7f8f5]"}`}
+                onClick={() => onSelectInquiry(inquiry.id)}
+              >
+                <Cell>
+                  <InquirySelectionButton
+                    inquiryId={inquiry.id}
+                    customerName={inquiry.customer_name}
+                    selected={selectedInquiryId === inquiry.id}
+                    onSelect={onSelectInquiry}
+                  />
+                </Cell>
+                <Cell>{getInquiryPrimaryContact(inquiry)}</Cell>
+                <Cell>{inquiry.company_name || "회사명 없음"}</Cell>
+                <Cell>{inquiry.service_type}</Cell>
+                <Cell>
+                  <span className="inline-flex rounded-md bg-[#eaf3ed] px-2.5 py-1 text-xs font-semibold text-[#23583f]">
+                    {getInquiryStatusLabel(inquiry.status)}
+                  </span>
+                </Cell>
+                <Cell>{formatAdminInquiryCreatedAt(inquiry.created_at)}</Cell>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -315,6 +340,10 @@ function InquiryDetailPanel({
         <p className="mt-2 max-w-md text-sm leading-6 text-[#617068]">
           {state.message}
         </p>
+        <Button type="button" variant="outline" className="mt-4" onClick={state.onRetry} disabled={state.isRefreshing}>
+          {state.isRefreshing ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <RefreshCw aria-hidden className="size-4" />}
+          다시 시도
+        </Button>
       </section>
     );
   }
@@ -324,6 +353,9 @@ function InquiryDetailPanel({
       key={state.inquiry.id}
       inquiry={state.inquiry}
       notice={state.notice}
+      warning={state.warning}
+      onRetry={state.onRetry}
+      isRefreshing={state.isRefreshing}
       onUpdated={onUpdated}
     />
   );
@@ -344,10 +376,16 @@ function EmptyDetailMessage() {
 function InquiryDetailForm({
   inquiry,
   notice,
+  warning,
+  onRetry,
+  isRefreshing,
   onUpdated,
 }: Readonly<{
   inquiry: AdminInquiryDetail;
   notice?: string;
+  warning?: string;
+  onRetry: () => void;
+  isRefreshing: boolean;
   onUpdated: (inquiry: AdminInquiryDetail) => void;
 }>) {
   const [status, setStatus] = useState<InquiryStatus>(inquiry.status);
@@ -422,6 +460,7 @@ function InquiryDetailForm({
       </div>
 
       <div className="space-y-5 p-5">
+        {warning ? <QueryRefreshNotice message={warning} onRetry={onRetry} isRefreshing={isRefreshing} /> : null}
         <div className="grid gap-3 sm:grid-cols-2">
           <DetailField label="연락처" value={getInquiryPrimaryContact(inquiry)} />
           <DetailField label="회사명" value={inquiry.company_name || "회사명 없음"} />
@@ -515,6 +554,21 @@ function InquiryDetailForm({
         <InquiryConversionPanel inquiry={inquiry} onInquiryUpdated={onUpdated} />
       </div>
     </section>
+  );
+}
+
+function QueryRefreshNotice({ message, onRetry, isRefreshing }: Readonly<{ message: string; onRetry: () => void; isRefreshing: boolean }>) {
+  return (
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f2d5a7] bg-[#fff8e8] px-5 py-3 text-sm text-[#744b00]">
+      <span className="flex items-center gap-2">
+        <AlertCircle aria-hidden className="size-4 shrink-0" />
+        {message}
+      </span>
+      <Button type="button" variant="outline" size="sm" onClick={onRetry} disabled={isRefreshing}>
+        {isRefreshing ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <RefreshCw aria-hidden className="size-4" />}
+        다시 시도
+      </Button>
+    </div>
   );
 }
 
