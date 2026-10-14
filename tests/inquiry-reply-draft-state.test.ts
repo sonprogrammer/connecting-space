@@ -7,6 +7,10 @@ import {
   getSlackDeliveryPresentation,
   markReplyDraftRegenerationPending,
 } from "../src/features/manage-inquiry-reply/model/reply-draft-state";
+import {
+  emptyReplyDraftFormState,
+  syncReplyDraftFormState,
+} from "../src/features/manage-inquiry-reply/model/reply-draft-form-state";
 
 describe("inquiry reply draft state", () => {
   test("keeps missing, generating, ready, and failed states distinct", () => {
@@ -66,5 +70,54 @@ describe("inquiry reply draft state", () => {
     assert.equal(pending.status, "generating");
     assert.equal(pending.lastError, null);
     assert.equal(pending.generationJob, null);
+  });
+
+  test("preserves unsaved summary and body edits when a background refetch returns", () => {
+    const initial = syncReplyDraftFormState(emptyReplyDraftFormState, {
+      inquiryId: "inquiry-1",
+      summary: "서버 요약",
+      draft: "서버 본문",
+    });
+    const editing = { ...initial, summary: "수정 중 요약", draft: "수정 중 본문" };
+
+    const afterRefetch = syncReplyDraftFormState(editing, {
+      inquiryId: "inquiry-1",
+      summary: "최신 서버 요약",
+      draft: "최신 서버 본문",
+    });
+
+    assert.equal(afterRefetch.summary, "수정 중 요약");
+    assert.equal(afterRefetch.draft, "수정 중 본문");
+  });
+
+  test("updates untouched fields from a refetch while retaining the edited field", () => {
+    const initial = syncReplyDraftFormState(emptyReplyDraftFormState, {
+      inquiryId: "inquiry-1",
+      summary: "서버 요약",
+      draft: "서버 본문",
+    });
+    const editing = { ...initial, summary: "수정 중 요약" };
+
+    const afterRefetch = syncReplyDraftFormState(editing, {
+      inquiryId: "inquiry-1",
+      summary: "최신 서버 요약",
+      draft: "최신 서버 본문",
+    });
+
+    assert.equal(afterRefetch.summary, "수정 중 요약");
+    assert.equal(afterRefetch.draft, "최신 서버 본문");
+  });
+
+  test("hydrates a different inquiry instead of carrying edits across IDs", () => {
+    const editing = { ...emptyReplyDraftFormState, inquiryId: "inquiry-1", summary: "수정 중 요약", draft: "수정 중 본문", serverSummary: "서버 요약", serverDraft: "서버 본문" };
+
+    const nextInquiry = syncReplyDraftFormState(editing, {
+      inquiryId: "inquiry-2",
+      summary: "다른 문의 요약",
+      draft: "다른 문의 본문",
+    });
+
+    assert.equal(nextInquiry.summary, "다른 문의 요약");
+    assert.equal(nextInquiry.draft, "다른 문의 본문");
   });
 });

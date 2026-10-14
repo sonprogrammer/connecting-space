@@ -13,6 +13,7 @@ import { getDraftStatusCopy, getReplyDraftFailure, getSlackDeliveryPresentation,
 import { ReplyDraftGenerationJobStatus } from "./reply-draft-generation-job-status";
 import { ReplyDraftGenerationMetadata } from "./reply-draft-generation-metadata";
 import { adminReplyDraftQueryKeys, fetchAdminReplyDraft, ReplyDraftQueryError } from "../model/reply-draft-queries";
+import { emptyReplyDraftFormState, syncReplyDraftFormState } from "../model/reply-draft-form-state";
 import { adminInquiryQueryKeys } from "@/entities/inquiry/model/admin-inquiry-query-keys";
 import { resetAdminWorkItemsCache } from "@/entities/admin-work-item/model/reset-query-cache";
 
@@ -32,14 +33,21 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
       : { status: "error", message: draftQuery.error instanceof ReplyDraftQueryError && [401, 403].includes(draftQuery.error.status) ? "관리자 로그인이 만료되었습니다. 다시 로그인해 주세요." : draftQuery.error.message }
     : draftQuery.data?.status === "generating" ? { status: "generating" }
       : draftQuery.data ? { status: "success", draft: draftQuery.data } : { status: "missing" };
-  const [summary, setSummary] = useState("");
-  const [draftText, setDraftText] = useState("");
+  const [formState, setFormState] = useState(emptyReplyDraftFormState);
+  const { summary, draft: draftText } = formState;
   const [busy, setBusy] = useState<"save" | "regenerate" | "slack" | null>(null);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
   const load = () => { setNotice(null); void draftQuery.refetch(); };
   useEffect(() => { if (draftQuery.error instanceof ReplyDraftQueryError && [401, 403].includes(draftQuery.error.status)) redirectToAdminLogin(); }, [draftQuery.error]);
-  useEffect(() => { if (draftQuery.data) queueMicrotask(() => { setSummary(draftQuery.data!.summary); setDraftText(draftQuery.data!.draft); }); }, [draftQuery.data, draftQuery.dataUpdatedAt]);
+  useEffect(() => {
+    if (!draftQuery.data) return;
+    queueMicrotask(() => setFormState((current) => syncReplyDraftFormState(current, {
+      inquiryId,
+      summary: draftQuery.data!.summary,
+      draft: draftQuery.data!.draft,
+    })));
+  }, [draftQuery.data, draftQuery.dataUpdatedAt, inquiryId]);
 
   async function requestAction(kind: "regenerate" | "slack") {
     setBusy(kind); setNotice(null);
@@ -102,9 +110,9 @@ export function InquiryReplyDraftPanel({ inquiryId }: Readonly<{ inquiryId: stri
       action={<Button type="button" variant="outline" onClick={() => void requestAction("regenerate")} disabled={busy !== null}>{busy === "regenerate" ? <Loader2 aria-hidden className="animate-spin" /> : <RotateCcw aria-hidden />}다시 생성</Button>}
     />
     {editable ? <div className="mt-5 grid gap-4">
-      <label className="grid gap-2 text-sm font-semibold text-[#526057]">문의 요약<textarea value={summary} onChange={(event) => setSummary(event.target.value)} maxLength={2000} rows={4} disabled={busy !== null} className="resize-y rounded-md border border-[#dfe3dc] px-3 py-2 font-normal leading-6 text-[#17201a] outline-none focus:border-[#2e6f4f] focus:ring-3 focus:ring-[#2e6f4f]/15" /></label>
+      <label className="grid gap-2 text-sm font-semibold text-[#526057]">문의 요약<textarea value={summary} onChange={(event) => setFormState((current) => ({ ...current, summary: event.target.value }))} maxLength={2000} rows={4} disabled={busy !== null} className="resize-y rounded-md border border-[#dfe3dc] px-3 py-2 font-normal leading-6 text-[#17201a] outline-none focus:border-[#2e6f4f] focus:ring-3 focus:ring-[#2e6f4f]/15" /></label>
       {draft.needsConfirmation.length > 0 ? <div className="rounded-md border border-[#ead7aa] bg-[#fffbf1] p-4"><h4 className="flex items-center gap-2 text-sm font-semibold text-[#72551b]"><TriangleAlert aria-hidden className="size-4" />고객 확인 필요</h4><ul className="mt-3 space-y-3">{draft.needsConfirmation.map((item, index) => <li key={`${item.topic}-${index}`} className="text-sm leading-6"><strong>{item.topic}</strong><p className="text-[#6a6252]">{item.reason}</p><p className="mt-1 text-[#72551b]">질문 제안: {item.suggestedQuestion}</p></li>)}</ul></div> : null}
-      <label className="grid gap-2 text-sm font-semibold text-[#526057]">답변 초안<textarea value={draftText} onChange={(event) => setDraftText(event.target.value)} maxLength={12000} rows={12} required disabled={busy !== null} className="resize-y rounded-md border border-[#dfe3dc] px-3 py-2 font-normal leading-6 text-[#17201a] outline-none focus:border-[#2e6f4f] focus:ring-3 focus:ring-[#2e6f4f]/15" /></label>
+      <label className="grid gap-2 text-sm font-semibold text-[#526057]">답변 초안<textarea value={draftText} onChange={(event) => setFormState((current) => ({ ...current, draft: event.target.value }))} maxLength={12000} rows={12} required disabled={busy !== null} className="resize-y rounded-md border border-[#dfe3dc] px-3 py-2 font-normal leading-6 text-[#17201a] outline-none focus:border-[#2e6f4f] focus:ring-3 focus:ring-[#2e6f4f]/15" /></label>
       <div className="flex flex-wrap justify-end gap-2"><Button type="button" variant="outline" onClick={() => void requestAction("regenerate")} disabled={busy !== null}>{busy === "regenerate" ? <Loader2 aria-hidden className="animate-spin" /> : <RotateCcw aria-hidden />}재생성</Button><Button type="button" variant="outline" onClick={() => void copyDraft()} disabled={busy !== null || !draftText}><Clipboard aria-hidden />복사</Button><Button type="button" onClick={() => void save()} disabled={busy !== null || !draftText.trim()}>{busy === "save" ? <Loader2 aria-hidden className="animate-spin" /> : <Save aria-hidden />}초안 저장</Button></div>
     </div> : null}
     <div className="mt-5 grid gap-3 rounded-md border border-[#e8ebe5] bg-[#fbfcf9] p-4 text-xs text-[#617068] sm:grid-cols-2 xl:grid-cols-5"><p>마지막 갱신: <strong className="text-[#3c4941]">{formatDateTime(draft.updatedAt)}</strong></p><p>생성 기록: <strong className="break-all text-[#3c4941]">{draft.generationRecordId || "기록 없음"}</strong></p><ReplyDraftGenerationMetadata generationRecord={draft.generationRecord} /></div>
