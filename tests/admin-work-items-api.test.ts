@@ -59,4 +59,23 @@ describe("관리자 오늘 할 일 API", () => {
     await route.GET(new NextRequest("http://localhost/api/admin/work-items?sort=latest"));
     assert.equal(rpcArgs?.p_sort, "latest");
   });
+
+  test("asOf가 없으면 요청 시점 snapshot을 p_now로 전달한다", async () => {
+    await route.GET(new NextRequest("http://localhost/api/admin/work-items?page=1&pageSize=25&group=all&sort=waiting"));
+
+    assert.equal(typeof rpcArgs?.p_now, "string");
+    assert.match(rpcArgs?.p_now as string, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+  });
+
+  test("명시한 asOf를 페이지 간 동일 snapshot으로 그대로 전달한다", async () => {
+    const asOf = "2026-10-17T13:32:56.000Z";
+
+    await route.GET(new NextRequest(`http://localhost/api/admin/work-items?page=1&asOf=${asOf}`));
+    const firstPageNow = rpcArgs?.p_now;
+    await route.GET(new NextRequest(`http://localhost/api/admin/work-items?page=2&asOf=${asOf}`));
+    const secondPageNow = rpcArgs?.p_now;
+
+    assert.equal(firstPageNow, asOf);
+    assert.equal(secondPageNow, asOf);
+  });
 });
