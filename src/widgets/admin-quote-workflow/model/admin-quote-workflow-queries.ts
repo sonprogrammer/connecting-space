@@ -7,7 +7,9 @@ import type {
   ManualQuoteDeliveryInput,
   QuoteSnapshotInput,
 } from "@/entities/quote";
-import type { AdminInquiryDetail, AdminInquiryListItem } from "@/entities/inquiry";
+import type { AdminInquiryDetail } from "@/entities/inquiry";
+import { adminInquiryQueryKeys } from "../../../entities/inquiry/model/admin-inquiry-query-keys";
+import { fetchAdminInquiryList } from "../../../entities/inquiry/model/admin-inquiry-queries";
 import type { ApiResponse } from "@/shared/types/api";
 import { redirectToAdminLogin } from "../../../shared/lib/auth/admin-login-redirect";
 
@@ -36,14 +38,12 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const adminQuoteKeys = {
-  inquiries: ["admin", "inquiries"] as const,
+  inquiries: adminInquiryQueryKeys.list(),
   inquiry: (id: string) => ["admin", "inquiry", id] as const,
   quote: (id: string) => ["admin", "quote", id] as const,
 };
 
-export function fetchAdminInquiries(): Promise<AdminInquiryListItem[]> {
-  return requestJson("/api/admin/inquiries");
-}
+export const fetchAdminInquiries = fetchAdminInquiryList;
 
 export function fetchAdminInquiry(id: string): Promise<AdminInquiryDetail> {
   return requestJson(`/api/admin/inquiries/${encodeURIComponent(id)}`);
