@@ -29,12 +29,13 @@ export async function GET(request: NextRequest) {
     return jsonError("VALIDATION_ERROR", "Invalid work items query", 400, parsed.error.flatten());
   }
 
+  const snapshotAt = parsed.data.asOf ?? new Date().toISOString();
   const { data, error } = await admin.supabase.rpc("get_admin_work_items", {
     p_page: parsed.data.page,
     p_page_size: parsed.data.pageSize,
     p_group: parsed.data.group,
     p_sort: parsed.data.sort ?? (parsed.data.group === "all" ? "waiting" : "latest"),
-    ...(parsed.data.asOf ? { p_now: parsed.data.asOf } : {}),
+    p_now: snapshotAt,
   });
   if (error || !data) {
     const status = error?.code === "42501" ? 403 : error?.code === "22023" ? 400 : 500;
