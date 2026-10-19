@@ -42,9 +42,18 @@ description: Use when implementing React or Next.js frontend work in the connect
 ## UI·보안 경계
 
 - 360px/768px/1280px에서 잘림·겹침·가로 스크롤을 피하고 semantic HTML/native control, label·오류 연결, 보이는 focus, 키보드 순서와 aria 상태를 제공한다.
-- 모든 목록 조회 인수를 query key에 포함하고 mutation pending 중 중복 요청을 잠근다. 성공 시 관련 목록·상세 캐시를 갱신한다.
+- mutation pending 중 중복 요청을 잠그고 성공 시 관련 목록·상세 캐시를 갱신한다.
 - 서버 응답에 없는 모델명·상태·계산값을 임의 표시하지 않는다. `NEXT_PUBLIC_`가 아닌 환경변수, service role key, webhook·승인 토큰·고객 PII를 클라이언트 번들·로그·오류에 넣지 않는다.
 - UI 숨김을 권한 검사로 간주하지 말고 서버의 401/403을 안전한 메시지와 재시도로 처리한다.
+
+## 데이터 요청과 캐싱
+
+- 작업 전에 각 화면의 데이터 출처·소비자·요청 URL·query key·staleTime/gcTime·mutation 무효화 흐름을 확인한다. 반복 요청은 provider 재마운트, stale/refetch 정책, 명시적 refetch, 서로 다른 query key 중 무엇 때문인지 Network와 React Query 상태로 구분한다.
+- 같은 의미·응답 형태·인수의 데이터를 여러 화면에서 쓰면 entity/model의 정규 query key와 query function을 공유한다. 모든 응답 영향 인수(페이지, 필터, 정렬, snapshot 등)는 key에 포함하고, 인증 사용자별 데이터는 세션 경계를 넘겨 재사용하지 않는다.
+- 클라이언트 정렬은 정렬 대상 전체 데이터가 로드되어 있고 서버 정렬 의미와 일치할 때만 사용한다. 페이지네이션·전체 건수·서버 우선순위·snapshot 일관성이 필요하면 서버 정렬을 유지한다. 정렬 옵션별 key를 안정적으로 유지해 되돌아갈 때 fresh하고 보존된 캐시를 재사용한다.
+- staleTime은 허용 가능한 데이터 지연에, gcTime은 화면을 떠난 뒤 재사용할 시간에 맞춘다. 공유 QueryClient는 화면 간 캐시 재사용의 전제일 뿐 네트워크 요청이 없음을 보장하지 않는다. stale 데이터는 화면에 표시하면서 백그라운드 재요청할 수 있고, staleTime 만료, mount/focus/reconnect refetch, 명시적 refetch/invalidation, 다른 key, gcTime 만료도 요청을 일으킬 수 있으므로 원인을 구분한다. `fetch(..., { cache: "no-store" })`가 브라우저에서 호출되면 HTTP 캐시 설정이며 TanStack Query 메모리 캐시와 별개다.
+- Next.js 서버 캐시는 Server Component/서버 데이터 조회의 캐시다. 클라이언트의 `/api/...` 요청 자체나 TanStack Query key를 대체하지 않는다. 인증된 관리자·고객 데이터는 사용자 격리와 mutation 후 무효화가 명시적으로 설계·검증되지 않으면 공유 가능한 Next 서버 캐시에 넣지 않는다. 공개·사용자 비종속 데이터에만 적절한 revalidation과 함께 검토한다.
+- mutation 이후 실제로 영향받는 공유 query key를 갱신/무효화하고, 검증에서 화면 재진입·정렬 전환/복귀·페이지 이동·mutation 후 데이터 일관성을 확인한다. Next 캐시 동작을 바꾸기 전 설치된 Next 버전의 `node_modules/next/dist/docs/`를 읽는다.
 
 ## 자체검증과 인계
 
