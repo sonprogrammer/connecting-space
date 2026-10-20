@@ -35,6 +35,17 @@ description: Use when implementing API, Supabase, authentication, migration, wor
 - worker 상태(`pending/processing/retry/failed/completed`), bounded retry/backoff/최대 시도/stale lock 회수를 고정한다. idempotency key와 payload는 재시도에도 안정적이어야 한다.
 - 외부 전송과 핵심 저장을 분리한다. provider 성공 후 finalize 실패를 재처리할 수 있게 하고, 실제 key 없이 계약·오류·retry를 테스트한다. webhook URL·수신자·본문·provider 원문 오류는 마스킹한다.
 
+## 보안 검토
+
+공개·관리자·worker 경계가 바뀌면 아래 항목을 해당 route와 데이터 흐름에서 확인하고, 미구현은 숨기지 말고 PR의 위험/후속 조치로 적는다.
+
+- 공개 또는 비용 유발 endpoint(문의, 로그인, AI/provider 작업)는 schema 검증만으로 남용 방지가 되지 않는다. IP/계정별 rate limit·bot 방어·비용/동시성 한도를 확인하고, 원시 요청 본문 크기도 파싱 전에 제한한다. 429 및 우회·실패 동작을 테스트한다.
+- Cookie 인증 mutation은 SameSite만으로 CSRF 방어가 완결됐다고 보지 않는다. same-origin `Origin` 검증 또는 CSRF token 등 서버 측 정책과 JSON/content-type 경계를 확인하고 cross-origin 거부를 테스트한다.
+- 사용자·고객·견적 데이터를 반환하는 응답은 서버에서 `Cache-Control: private, no-store`를 보장한다. CSP/frame 제한, `X-Content-Type-Options`, `Referrer-Policy`, HTTPS/HSTS 등 보안 헤더의 적용 위치를 확인한다. 앱 코드 밖(Vercel/CDN)의 설정이면 실제 설정 근거가 없을 때 미확인으로 보고한다.
+- service-role/provider 비밀을 쓰는 모듈은 server-only 경계로 제한하고 client import/bundle에 포함되지 않는지 확인한다. 설정 가능한 provider URL은 HTTPS·host allowlist·redirect 정책을 검증해 SSRF를 막는다.
+- RLS 활성 여부뿐 아니라 anon/auth/admin/service_role별 table/function grant와 object-level 접근을 테스트한다. `SECURITY DEFINER`는 고정 `search_path`, 최소 권한, 명시적 execute grant/revoke를 갖춰야 한다.
+- 코드/migration에서 확인한 사실과 배포된 RLS·rate limit·header·secret·provider 설정은 구분한다. 원격/운영 설정을 확인하지 않았다면 안전하다고 단정하지 않는다.
+
 ## 로컬 DB 안전
 
 통합 테스트 전 URL host가 정확히 `localhost` 또는 `127.0.0.1`인지 확인한다. 허용되는 것은 격리 로컬 Supabase와 로컬 `supabase db reset`뿐이다. 로컬 환경이 없으면 원격으로 대신 검증하지 말고 `BLOCKED`를 보고한다. 실제 key/token/project ref와 고객 데이터를 명령 출력·로그·PR에 남기지 않는다.
