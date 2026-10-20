@@ -5,6 +5,7 @@ import { describe, test } from "node:test";
 import { QueryClient } from "@tanstack/query-core";
 
 import * as inquiryQueries from "../src/widgets/admin-dashboard/model/admin-inquiry-queries";
+import * as quoteWorkflowQueries from "../src/widgets/admin-quote-workflow/model/admin-quote-workflow-queries";
 
 describe("admin inquiry query cache", () => {
   test("separates list and inquiry detail keys by id", () => {
@@ -31,6 +32,40 @@ describe("admin inquiry query cache", () => {
 
     assert.equal(calls, 2);
     client.clear();
+  });
+
+  test("coalesces dashboard and quote workflow inquiry list requests", async () => {
+    const previousFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls += 1;
+      return new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000 } } });
+    try {
+      const [dashboardInquiries, quoteInquiries] = await Promise.all([
+        client.fetchQuery({
+          queryKey: inquiryQueries.adminInquiryQueryKeys.list(),
+          queryFn: inquiryQueries.fetchAdminInquiryList,
+        }),
+        client.fetchQuery({
+          queryKey: quoteWorkflowQueries.adminQuoteKeys.inquiries,
+          queryFn: quoteWorkflowQueries.fetchAdminInquiries,
+        }),
+      ]);
+
+      assert.deepEqual(quoteWorkflowQueries.adminQuoteKeys.inquiries, inquiryQueries.adminInquiryQueryKeys.list());
+      assert.equal(quoteWorkflowQueries.fetchAdminInquiries, inquiryQueries.fetchAdminInquiryList);
+      assert.deepEqual(dashboardInquiries, quoteInquiries);
+      assert.equal(calls, 1);
+    } finally {
+      client.clear();
+      globalThis.fetch = previousFetch;
+    }
   });
 
   test("GET fetchers preserve no-store and redirect-worthy status in their error", async () => {

@@ -63,7 +63,7 @@ export function AdminInquiryList() {
   const queryClient = useQueryClient();
   const inquiriesQuery = useQuery({
     queryKey: adminInquiryQueryKeys.list(),
-    queryFn: ({ signal }) => fetchAdminInquiryList({ signal }),
+    queryFn: fetchAdminInquiryList,
   });
   const [selectedInquiryId, setSelectedInquiryId] = useState<string | null>(
     null,

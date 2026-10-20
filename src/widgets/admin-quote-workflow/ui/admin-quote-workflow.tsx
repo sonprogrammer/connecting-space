@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, Download, FilePlus2, Loader2, RefreshCw, Send, ShieldCheck } from "lucide-react";
 
@@ -9,6 +9,7 @@ import { resetAdminWorkItemsCache } from "@/entities/admin-work-item/model/reset
 import type { ConfirmQuoteContractInput, QuoteVersionRow } from "@/entities/quote";
 import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/utils";
+import { redirectToAdminLogin } from "@/shared/lib/auth/admin-login-redirect";
 import {
   adminQuoteKeys,
   AdminQuoteRequestError,
@@ -23,6 +24,7 @@ import {
   retryQuoteEmail,
   sendQuoteEmail,
 } from "../model/admin-quote-workflow-queries";
+import { AdminInquiryQueryError } from "@/entities/inquiry/model/admin-inquiry-queries";
 import {
   calculateQuoteSplit,
   completeContractConfirmation,
@@ -62,6 +64,15 @@ export function AdminQuoteWorkflow() {
   const inquiry = useQuery({ queryKey: adminQuoteKeys.inquiry(selectedInquiryId), queryFn: () => fetchAdminInquiry(selectedInquiryId), enabled: Boolean(selectedInquiryId) });
   const quote = useQuery({ queryKey: adminQuoteKeys.quote(quoteId), queryFn: () => fetchAdminQuote(quoteId), enabled: Boolean(quoteId) });
   const selectedVersion = useMemo(() => quote.data?.versions.find((version) => version.id === (quote.data.quote.latest_version_id ?? quote.data.versions[0]?.id)) ?? quote.data?.versions[0], [quote.data]);
+
+  useEffect(() => {
+    if (
+      inquiries.error instanceof AdminInquiryQueryError &&
+      [401, 403].includes(inquiries.error.status ?? 0)
+    ) {
+      redirectToAdminLogin();
+    }
+  }, [inquiries.error]);
 
   const createInquiry = useMutation({
     mutationFn: createAdminInquiry,
