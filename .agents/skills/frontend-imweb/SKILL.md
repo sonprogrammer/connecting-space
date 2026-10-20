@@ -49,11 +49,11 @@ description: Use when implementing React or Next.js frontend work in the connect
 ## 클라이언트 보안 점검
 
 - 브라우저 번들에는 공개 가능한 `NEXT_PUBLIC_` 값만 둔다. anon key는 공개값이지만 데이터 접근 안전성은 서버 권한 검사와 RLS에 달려 있다. access/refresh token, service-role key, webhook, 고객 PII를 localStorage/sessionStorage, URL, console, 분석 이벤트 또는 오류 문구에 넣지 않는다.
-- React 기본 텍스트 렌더링의 escaping을 유지한다. 사용자 입력을 `dangerouslySetInnerHTML`에 넣지 말고, 사용자 제공 링크/redirect는 허용된 프로토콜·동일 출처를 검증한다. 예외적인 HTML/스크립트는 서버 계약과 CSP까지 검토한다.
+- React 기본 텍스트 렌더링의 escaping을 유지한다. 사용자 입력을 `dangerouslySetInnerHTML`에 넣지 않는다. redirect 목적지는 동일 출처 또는 명시적 allowlist로 제한하고 `javascript:` 등 위험 protocol을 거부한다. 일반 outbound 링크는 제품/API 계약에서 허용한 protocol(예: HTTP(S))을 검증해 정상적인 외부 사이트 연결을 유지한다. 새 탭 링크에는 `rel="noopener noreferrer"` 등 opener/referrer 보호를 적용한다. 예외적인 HTML/스크립트는 서버 계약과 CSP까지 검토한다.
 - 관리자/고객 데이터의 브라우저 HTTP 캐시와 React Query 메모리 캐시는 별도다. 민감 API 응답은 서버 `Cache-Control: private, no-store`를 요구하고, 로그아웃·계정 전환·인증 만료 시 QueryClient의 민감 데이터를 제거한다. 전체 페이지 reload가 있어도 세션 경계 테스트로 확인한다.
 - Cookie 인증 mutation의 CSRF 방어는 서버 책임이다. 클라이언트에서 same-origin 요청을 사용하되 이를 서버의 Origin/CSRF 검증 대체로 주장하지 않는다. UI의 비활성화/숨김도 권한 검사가 아니다.
 - 공개 견적 bearer token이 URL 경로/쿼리에 있으면 비밀로 취급한다. 로그·analytics/referrer·외부 리소스 유출을 피하고, 필요한 `Referrer-Policy`/CSP/security headers는 Backend 또는 배포 담당과 확인한다. 운영 설정을 확인할 수 없으면 미확인으로 인계한다.
-- 검증에서 인증 전후 및 계정 전환 캐시 제거, XSS성 텍스트의 안전한 표시, 외부 URL/redirect 거부, 민감정보 비노출을 확인한다. 보안 헤더나 rate limit이 없는 경우 클라이언트 코드로 우회하지 말고 담당 역할에 근거와 함께 요청한다.
+- 검증에서 인증 전후 및 계정 전환 캐시 제거, XSS성 텍스트의 안전한 표시, 위험 protocol·비허용 redirect 거부와 계약상 허용된 outbound 링크 유지, 민감정보 비노출을 확인한다. 보안 헤더나 rate limit이 없는 경우 클라이언트 코드로 우회하지 말고 담당 역할에 근거와 함께 요청한다.
 
 ## 데이터 요청과 캐싱
 
