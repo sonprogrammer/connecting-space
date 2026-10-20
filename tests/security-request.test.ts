@@ -155,6 +155,31 @@ describe("request security contract", () => {
     }
   });
 
+  test("fails closed when one Upstash pipeline command returns an error", async () => {
+    const previousFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response(
+      JSON.stringify([{ result: 1 }, { error: "EXPIRE command failed" }]),
+      { status: 200 },
+    )) as typeof fetch;
+    try {
+      const result = await enforcePublicRequestSecurity(
+        request("/api/inquiries", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email: "a@b.test" }),
+        }),
+        {
+          hashSecret: "test-rate-limit-secret",
+          store: new UpstashRateLimitStore("https://test.upstash.io", "secret-token"),
+        },
+      );
+      assert.equal(result?.status, 503);
+      assert.equal((await result?.json()).error.code, "RATE_LIMIT_UNAVAILABLE");
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
+  });
+
   test("applies the contract at the Next proxy boundary", async () => {
     const previous = {
       url: process.env.UPSTASH_REDIS_REST_URL,
