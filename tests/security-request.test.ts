@@ -180,6 +180,33 @@ describe("request security contract", () => {
     }
   });
 
+  test("fails closed when the Upstash pipeline shape is incomplete or malformed", async () => {
+    for (const pipeline of [
+      [{ result: 1 }],
+      [{ result: 1 }, {}],
+      [{ result: 1 }, { result: "1" }],
+    ]) {
+      const previousFetch = globalThis.fetch;
+      globalThis.fetch = (async () => new Response(JSON.stringify(pipeline), { status: 200 })) as typeof fetch;
+      try {
+        const result = await enforcePublicRequestSecurity(
+          request("/api/inquiries", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email: "a@b.test" }),
+          }),
+          {
+            hashSecret: "test-rate-limit-secret",
+            store: new UpstashRateLimitStore("https://test.upstash.io", "secret-token"),
+          },
+        );
+        assert.equal(result?.status, 503);
+      } finally {
+        globalThis.fetch = previousFetch;
+      }
+    }
+  });
+
   test("applies the contract at the Next proxy boundary", async () => {
     const previous = {
       url: process.env.UPSTASH_REDIS_REST_URL,

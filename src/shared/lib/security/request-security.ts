@@ -42,19 +42,19 @@ export class UpstashRateLimitStore implements RateLimitStore {
     if (!response?.ok) throw new RateLimitUnavailableError("Rate limit provider unavailable");
 
     const result = await response.json().catch(() => null) as unknown;
-    const hasCommandError = Array.isArray(result) && result.some((entry) => (
-      entry !== null
-      && typeof entry === "object"
-      && "error" in entry
-      && entry.error !== null
-      && entry.error !== undefined
-    ));
-    const count = Array.isArray(result) && !hasCommandError && typeof result[0]?.result === "number"
-      ? result[0].result
-      : null;
+    const count = isSuccessfulPipeline(result) ? result[0].result : null;
     if (count === null) throw new RateLimitUnavailableError("Invalid rate limit provider response");
     return count;
   }
+}
+
+function isSuccessfulPipeline(value: unknown): value is [{ result: number }, { result: number }] {
+  if (!Array.isArray(value) || value.length !== 2) return false;
+  return value.every((entry) => {
+    if (entry === null || typeof entry !== "object" || "error" in entry) return false;
+    const result = (entry as { result?: unknown }).result;
+    return typeof result === "number" && Number.isFinite(result);
+  });
 }
 
 export function createConfiguredRateLimitStore() {
