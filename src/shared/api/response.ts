@@ -9,6 +9,7 @@ export function jsonError(
   message: string,
   status: number,
   details?: unknown,
+  headers?: HeadersInit,
 ) {
   return NextResponse.json(
     {
@@ -18,6 +19,6 @@ export function jsonError(
         details,
       },
     },
-    { status },
+    { status, headers },
   );
 }
