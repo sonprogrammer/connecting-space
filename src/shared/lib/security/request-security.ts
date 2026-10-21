@@ -50,11 +50,14 @@ export class UpstashRateLimitStore implements RateLimitStore {
 
 function isSuccessfulPipeline(value: unknown): value is [{ result: number }, { result: number }] {
   if (!Array.isArray(value) || value.length !== 2) return false;
-  return value.every((entry) => {
+  const [increment, expiry] = value;
+  if (!value.every((entry) => {
     if (entry === null || typeof entry !== "object" || "error" in entry) return false;
     const result = (entry as { result?: unknown }).result;
     return typeof result === "number" && Number.isFinite(result);
-  });
+  })) return false;
+  return (expiry as { result: number }).result === 1
+    && (increment as { result: number }).result >= 1;
 }
 
 export function createConfiguredRateLimitStore() {

@@ -185,6 +185,7 @@ describe("request security contract", () => {
       [{ result: 1 }],
       [{ result: 1 }, {}],
       [{ result: 1 }, { result: "1" }],
+      [{ result: 1 }, { result: 0 }],
     ]) {
       const previousFetch = globalThis.fetch;
       globalThis.fetch = (async () => new Response(JSON.stringify(pipeline), { status: 200 })) as typeof fetch;
