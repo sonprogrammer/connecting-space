@@ -18,7 +18,11 @@ export type RateLimitUnavailableReason =
   | "upstash_token_missing"
   | "upstash_fetch_failed"
   | "upstash_http_error"
-  | "upstash_pipeline_error";
+  | "upstash_json_parse_failed"
+  | "upstash_pipeline_command_error"
+  | "upstash_pipeline_response_invalid"
+  | "upstash_expire_result_mismatch"
+  | "rate_limit_internal_error";
 
 export type RateLimitUnavailableLog = {
   event: "rate_limit_unavailable";
@@ -70,23 +74,39 @@ export class UpstashRateLimitStore implements RateLimitStore {
 
     if (!response.ok) throw new RateLimitUnavailableError("upstash_http_error", response.status);
 
-    const result = await response.json().catch(() => null) as unknown;
-    const count = isSuccessfulPipeline(result) ? result[0].result : null;
-    if (count === null) throw new RateLimitUnavailableError("upstash_pipeline_error");
-    return count;
+    let result: unknown;
+    try {
+      result = await response.json();
+    } catch {
+      throw new RateLimitUnavailableError("upstash_json_parse_failed");
+    }
+    return readPipelineCount(result);
   }
 }
 
-function isSuccessfulPipeline(value: unknown): value is [{ result: number }, { result: number }] {
-  if (!Array.isArray(value) || value.length !== 2) return false;
-  const [increment, expiry] = value;
-  if (!value.every((entry) => {
-    if (entry === null || typeof entry !== "object" || "error" in entry) return false;
-    const result = (entry as { result?: unknown }).result;
-    return typeof result === "number" && Number.isFinite(result);
-  })) return false;
-  return (expiry as { result: number }).result === 1
-    && (increment as { result: number }).result >= 1;
+function readPipelineCount(value: unknown): number {
+  if (!Array.isArray(value) || value.length !== 2) {
+    throw new RateLimitUnavailableError("upstash_pipeline_response_invalid");
+  }
+  const results = value.map((entry: unknown) => {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new RateLimitUnavailableError("upstash_pipeline_response_invalid");
+    }
+    if ("error" in entry) {
+      throw new RateLimitUnavailableError("upstash_pipeline_command_error");
+    }
+    if (!("result" in entry) || typeof entry.result !== "number" || !Number.isSafeInteger(entry.result)) {
+      throw new RateLimitUnavailableError("upstash_pipeline_response_invalid");
+    }
+    return entry.result;
+  });
+  if (results[0] < 1) {
+    throw new RateLimitUnavailableError("upstash_pipeline_response_invalid");
+  }
+  if (results[1] !== 1) {
+    throw new RateLimitUnavailableError("upstash_expire_result_mismatch");
+  }
+  return results[0];
 }
 
 export function createConfiguredRateLimitStore() {
@@ -157,7 +177,7 @@ export async function enforcePublicRequestSecurity(
     if (error instanceof RateLimitUnavailableError) {
       logRateLimitUnavailable(options.logger, error.reason, error.status);
     } else {
-      logRateLimitUnavailable(options.logger, "upstash_pipeline_error");
+      logRateLimitUnavailable(options.logger, "rate_limit_internal_error");
     }
     return jsonError("RATE_LIMIT_UNAVAILABLE", "Rate limiting is temporarily unavailable", 503, undefined, {
       "Retry-After": "30",

@@ -161,7 +161,7 @@ describe("request security contract", () => {
     const cases = [
       { response: null, reason: "upstash_fetch_failed" },
       { response: new Response("", { status: 429 }), reason: "upstash_http_error" },
-      { response: new Response(JSON.stringify([{ result: 1 }, { error: "private provider error" }]), { status: 200 }), reason: "upstash_pipeline_error" },
+      { response: new Response(JSON.stringify([{ result: 1 }, { error: "private provider error" }]), { status: 200 }), reason: "upstash_pipeline_command_error" },
     ];
     const previousFetch = globalThis.fetch;
     const captured = captureLogs();
@@ -188,7 +188,7 @@ describe("request security contract", () => {
     assert.deepEqual(captured.records.map(({ reason }) => reason), [
       "upstash_fetch_failed",
       "upstash_http_error",
-      "upstash_pipeline_error",
+      "upstash_pipeline_command_error",
     ]);
     assert.equal(captured.records[1].status, 429);
     const serialized = JSON.stringify(captured.records);
