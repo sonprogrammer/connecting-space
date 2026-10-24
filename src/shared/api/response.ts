@@ -11,6 +11,8 @@ export function jsonError(
   details?: unknown,
   headers?: HeadersInit,
 ) {
+  const errorHeaders = new Headers(headers);
+  errorHeaders.set("Cache-Control", "no-store");
   return NextResponse.json(
     {
       error: {
@@ -19,6 +21,6 @@ export function jsonError(
         details,
       },
     },
-    { status, headers },
+    { status, headers: errorHeaders },
   );
 }
