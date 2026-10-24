@@ -30,6 +30,14 @@ function store(sequence: number[] | Error): RateLimitStore {
   };
 }
 
+function captureLogs() {
+  const records: Array<Record<string, unknown>> = [];
+  return {
+    records,
+    logger: (record: string) => records.push(JSON.parse(record) as Record<string, unknown>),
+  };
+}
+
 describe("request security contract", () => {
   test("rejects an oversized inquiry before parsing the body", async () => {
     const body = "x".repeat(64 * 1024 + 1);
@@ -98,6 +106,95 @@ describe("request security contract", () => {
     );
     assert.equal(result?.status, 503);
     assert.equal((await result?.json()).error.code, "RATE_LIMIT_UNAVAILABLE");
+  });
+
+  test("logs a reason without secrets when the hash secret is missing", async () => {
+    const captured = captureLogs();
+    const result = await enforcePublicRequestSecurity(
+      request("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "private@example.test" }),
+      }),
+      { logger: captured.logger },
+    );
+
+    assert.equal(result?.status, 503);
+    assert.deepEqual(captured.records, [{
+      event: "rate_limit_unavailable",
+      provider: "upstash",
+      reason: "rate_limit_hash_secret_missing",
+    }]);
+    assert.equal(JSON.stringify(captured.records).includes("private@example.test"), false);
+  });
+
+  test("logs missing and invalid Upstash URL configuration distinctly", async () => {
+    const previousUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const previousToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+    const captured = captureLogs();
+    process.env.UPSTASH_REDIS_REST_TOKEN = "secret-token";
+    try {
+      delete process.env.UPSTASH_REDIS_REST_URL;
+      await enforcePublicRequestSecurity(
+        request("/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }),
+        { hashSecret: "test-rate-limit-secret", logger: captured.logger },
+      );
+      process.env.UPSTASH_REDIS_REST_URL = "https://evil.example/secret-path";
+      await enforcePublicRequestSecurity(
+        request("/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }),
+        { hashSecret: "test-rate-limit-secret", logger: captured.logger },
+      );
+    } finally {
+      process.env.UPSTASH_REDIS_REST_URL = previousUrl;
+      process.env.UPSTASH_REDIS_REST_TOKEN = previousToken;
+    }
+
+    assert.deepEqual(captured.records.map(({ reason }) => reason), [
+      "upstash_url_missing",
+      "upstash_url_invalid",
+    ]);
+    assert.equal(JSON.stringify(captured.records).includes("evil.example"), false);
+    assert.equal(JSON.stringify(captured.records).includes("secret-path"), false);
+  });
+
+  test("logs fetch, HTTP, and pipeline failures with safe reason codes", async () => {
+    const cases = [
+      { response: null, reason: "upstash_fetch_failed" },
+      { response: new Response("", { status: 429 }), reason: "upstash_http_error" },
+      { response: new Response(JSON.stringify([{ result: 1 }, { error: "private provider error" }]), { status: 200 }), reason: "upstash_pipeline_error" },
+    ];
+    const previousFetch = globalThis.fetch;
+    const captured = captureLogs();
+    try {
+      for (const current of cases) {
+        globalThis.fetch = (async () => {
+          if (current.response === null) throw new Error("private network detail");
+          return current.response.clone();
+        }) as typeof fetch;
+        const result = await enforcePublicRequestSecurity(
+          request("/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }),
+          {
+            hashSecret: "test-rate-limit-secret",
+            store: new UpstashRateLimitStore("https://test.upstash.io", "secret-token"),
+            logger: captured.logger,
+          },
+        );
+        assert.equal(result?.status, 503);
+      }
+    } finally {
+      globalThis.fetch = previousFetch;
+    }
+
+    assert.deepEqual(captured.records.map(({ reason }) => reason), [
+      "upstash_fetch_failed",
+      "upstash_http_error",
+      "upstash_pipeline_error",
+    ]);
+    assert.equal(captured.records[1].status, 429);
+    const serialized = JSON.stringify(captured.records);
+    assert.equal(serialized.includes("private network detail"), false);
+    assert.equal(serialized.includes("private provider error"), false);
+    assert.equal(serialized.includes("secret-token"), false);
   });
 
   test("requires an allowed Origin for cookie mutations", async () => {
