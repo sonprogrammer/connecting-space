@@ -92,7 +92,7 @@ Usage 증가만으로 두 명령 성공을 판단하지 않는다. HTTP 200 pipe
 2. Vercel Settings → Environment Variables에서 `UPSTASH_REDIS_REST_TOKEN`의 **Production** 범위를 선택한다. 기존 잘못된 토큰을 같은 DB의 Standard REST 토큰으로 교체한다. 값은 따옴표·Bearer 접두어·개행 없이 등록한다.
 3. `UPSTASH_REDIS_REST_URL`은 같은 DB의 REST URL인지 확인한다. 잘못된 경우에만 승인 범위 안에서 교체한다. `RATE_LIMIT_HASH_SECRET`은 누락 여부를 확인하며 불필요하게 교체하지 않는다(교체하면 식별자 해시가 바뀐다).
 4. Production 범위에만 저장한다. 카드 등록·유료 전환·자동 업그레이드 및 Preview 변수 변경을 함께 수행하지 않는다.
-5. 변수 저장만으로 기존 배포가 바뀌지 않는다. Deployments에서 검증된 Production 코드 배포를 선택하고 **Redeploy**한다. 대상이 Production인지와 사용할 SHA를 확인한다. 최신 Production 변수를 적용하는 새 배포를 생성한다. 환경변수 관련 장애에서는 기존 Build Cache 재사용을 해제하고 재빌드하는 절차를 권장한다.
+5. 변수 저장만으로 기존 배포가 바뀌지 않는다. Deployments에서 검증된 Production 코드 배포를 선택하고 **Redeploy**한다. 대상이 Production인지와 사용할 SHA를 확인한다. 최신 Production 변수를 적용하는 새 배포를 생성한다. Build Cache 사용 여부는 별도 선택 사항이며, 환경변수 변경 때문에 캐시 재사용을 해제할 필요는 없다.
 6. 배포가 Ready가 된 뒤 Production 도메인이 새 deployment를 가리키는지 확인한다. 승인된 관리자 계정으로 로그인 1회를 수행하고 정상 세션 발급을 확인한다. 비밀번호·쿠키·토큰은 기록하지 않는다.
 7. 같은 시간대 Runtime Logs에서 해당 요청의 503/명령 오류가 사라졌는지 확인한다. Usage 변화는 보조 지표로만 사용한다. 부하 테스트나 테스트 문의 생성은 별도 승인 없이 하지 않는다.
 8. 복구되지 않으면 반복 재배포하지 않고 새 reason·command/error_type·배포 SHA로 재분류한다. 실패와 성공 시각, 변경한 변수 **이름**과 담당자만 장애 기록에 남긴다.
