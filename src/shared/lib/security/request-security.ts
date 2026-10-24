@@ -24,11 +24,17 @@ export type RateLimitUnavailableReason =
   | "upstash_expire_result_mismatch"
   | "rate_limit_internal_error";
 
+type CommandError = {
+  command: "incr" | "expire";
+  error_type: "integer_or_range" | "wrong_type" | "permission_denied" | "authentication_required" | "read_only" | "out_of_memory" | "unknown";
+};
+
 export type RateLimitUnavailableLog = {
   event: "rate_limit_unavailable";
   provider: "upstash";
   reason: RateLimitUnavailableReason;
   status?: number;
+  command_errors?: CommandError[];
 };
 
 type SecurityOptions = {
@@ -42,6 +48,7 @@ class RateLimitUnavailableError extends Error {
   constructor(
     readonly reason: RateLimitUnavailableReason,
     readonly status?: number,
+    readonly commandErrors?: CommandError[],
   ) {
     super(reason);
   }
@@ -88,12 +95,21 @@ function readPipelineCount(value: unknown): number {
   if (!Array.isArray(value) || value.length !== 2) {
     throw new RateLimitUnavailableError("upstash_pipeline_response_invalid");
   }
+  const commandErrors: CommandError[] = [];
+  value.forEach((entry: unknown, index: number) => {
+    if (entry !== null && typeof entry === "object" && !Array.isArray(entry) && "error" in entry) {
+      commandErrors.push({
+        command: index === 0 ? "incr" : "expire",
+        error_type: classifyCommandError(entry.error),
+      });
+    }
+  });
+  if (commandErrors.length) {
+    throw new RateLimitUnavailableError("upstash_pipeline_command_error", undefined, commandErrors);
+  }
   const results = value.map((entry: unknown) => {
     if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
       throw new RateLimitUnavailableError("upstash_pipeline_response_invalid");
-    }
-    if ("error" in entry) {
-      throw new RateLimitUnavailableError("upstash_pipeline_command_error");
     }
     if (!("result" in entry) || typeof entry.result !== "number" || !Number.isSafeInteger(entry.result)) {
       throw new RateLimitUnavailableError("upstash_pipeline_response_invalid");
@@ -107,6 +123,18 @@ function readPipelineCount(value: unknown): number {
     throw new RateLimitUnavailableError("upstash_expire_result_mismatch");
   }
   return results[0];
+}
+
+function classifyCommandError(value: unknown): CommandError["error_type"] {
+  if (typeof value !== "string") return "unknown";
+  if (value === "ERR value is not an integer or out of range") return "integer_or_range";
+  // Only fixed Redis error prefixes are classified. Never emit message suffixes.
+  if (/^WRONGTYPE(?:\s|$)/.test(value)) return "wrong_type";
+  if (/^NOPERM(?:\s|$)/.test(value)) return "permission_denied";
+  if (/^NOAUTH(?:\s|$)/.test(value)) return "authentication_required";
+  if (/^READONLY(?:\s|$)/.test(value)) return "read_only";
+  if (/^OOM(?:\s|$)/.test(value)) return "out_of_memory";
+  return "unknown";
 }
 
 export function createConfiguredRateLimitStore() {
@@ -175,7 +203,7 @@ export async function enforcePublicRequestSecurity(
     }
   } catch (error) {
     if (error instanceof RateLimitUnavailableError) {
-      logRateLimitUnavailable(options.logger, error.reason, error.status);
+      logRateLimitUnavailable(options.logger, error.reason, error.status, error.commandErrors);
     } else {
       logRateLimitUnavailable(options.logger, "rate_limit_internal_error");
     }
@@ -191,12 +219,14 @@ function logRateLimitUnavailable(
   logger: SecurityOptions["logger"],
   reason: RateLimitUnavailableReason,
   status?: number,
+  commandErrors?: CommandError[],
 ) {
   const record: RateLimitUnavailableLog = {
     event: "rate_limit_unavailable",
     provider: "upstash",
     reason,
     ...(status === undefined ? {} : { status }),
+    ...(commandErrors === undefined ? {} : { command_errors: commandErrors }),
   };
   const serialized = JSON.stringify(record);
   try {
