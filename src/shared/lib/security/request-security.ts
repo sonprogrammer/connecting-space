@@ -11,13 +11,37 @@ export type RateLimitStore = {
   increment(key: string, windowSeconds: number): Promise<number>;
 };
 
+export type RateLimitUnavailableReason =
+  | "rate_limit_hash_secret_missing"
+  | "upstash_url_missing"
+  | "upstash_url_invalid"
+  | "upstash_token_missing"
+  | "upstash_fetch_failed"
+  | "upstash_http_error"
+  | "upstash_pipeline_error";
+
+export type RateLimitUnavailableLog = {
+  event: "rate_limit_unavailable";
+  provider: "upstash";
+  reason: RateLimitUnavailableReason;
+  status?: number;
+};
+
 type SecurityOptions = {
   store?: RateLimitStore;
   hashSecret?: string;
   allowedOrigins?: string[];
+  logger?: (record: string) => void;
 };
 
-class RateLimitUnavailableError extends Error {}
+class RateLimitUnavailableError extends Error {
+  constructor(
+    readonly reason: RateLimitUnavailableReason,
+    readonly status?: number,
+  ) {
+    super(reason);
+  }
+}
 
 export class UpstashRateLimitStore implements RateLimitStore {
   constructor(
@@ -26,24 +50,29 @@ export class UpstashRateLimitStore implements RateLimitStore {
   ) {}
 
   async increment(key: string, windowSeconds: number) {
-    const response = await fetch(`${this.url.replace(/\/$/, "")}/pipeline`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify([
-        ["INCR", key],
-        ["EXPIRE", key, String(windowSeconds)],
-      ]),
-      cache: "no-store",
-    }).catch(() => null);
+    let response: Response;
+    try {
+      response = await fetch(`${this.url.replace(/\/$/, "")}/pipeline`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify([
+          ["INCR", key],
+          ["EXPIRE", key, String(windowSeconds)],
+        ]),
+        cache: "no-store",
+      });
+    } catch {
+      throw new RateLimitUnavailableError("upstash_fetch_failed");
+    }
 
-    if (!response?.ok) throw new RateLimitUnavailableError("Rate limit provider unavailable");
+    if (!response.ok) throw new RateLimitUnavailableError("upstash_http_error", response.status);
 
     const result = await response.json().catch(() => null) as unknown;
     const count = isSuccessfulPipeline(result) ? result[0].result : null;
-    if (count === null) throw new RateLimitUnavailableError("Invalid rate limit provider response");
+    if (count === null) throw new RateLimitUnavailableError("upstash_pipeline_error");
     return count;
   }
 }
@@ -63,14 +92,15 @@ function isSuccessfulPipeline(value: unknown): value is [{ result: number }, { r
 export function createConfiguredRateLimitStore() {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) throw new RateLimitUnavailableError("Rate limit provider is not configured");
+  if (!url) throw new RateLimitUnavailableError("upstash_url_missing");
+  if (!token) throw new RateLimitUnavailableError("upstash_token_missing");
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:" || !parsed.hostname.endsWith(".upstash.io")) {
       throw new Error("Upstash URL must use an Upstash HTTPS host");
     }
   } catch {
-    throw new RateLimitUnavailableError("Rate limit provider is not configured");
+    throw new RateLimitUnavailableError("upstash_url_invalid");
   }
   return new UpstashRateLimitStore(url, token);
 }
@@ -93,6 +123,7 @@ export async function enforcePublicRequestSecurity(
 
   const hashSecret = options.hashSecret ?? process.env.RATE_LIMIT_HASH_SECRET;
   if (!hashSecret) {
+    logRateLimitUnavailable(options.logger, "rate_limit_hash_secret_missing");
     return jsonError("RATE_LIMIT_UNAVAILABLE", "Rate limiting is temporarily unavailable", 503, undefined, {
       "Retry-After": "30",
     });
@@ -122,13 +153,37 @@ export async function enforcePublicRequestSecurity(
         });
       }
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof RateLimitUnavailableError) {
+      logRateLimitUnavailable(options.logger, error.reason, error.status);
+    } else {
+      logRateLimitUnavailable(options.logger, "upstash_pipeline_error");
+    }
     return jsonError("RATE_LIMIT_UNAVAILABLE", "Rate limiting is temporarily unavailable", 503, undefined, {
       "Retry-After": "30",
     });
   }
 
   return null;
+}
+
+function logRateLimitUnavailable(
+  logger: SecurityOptions["logger"],
+  reason: RateLimitUnavailableReason,
+  status?: number,
+) {
+  const record: RateLimitUnavailableLog = {
+    event: "rate_limit_unavailable",
+    provider: "upstash",
+    reason,
+    ...(status === undefined ? {} : { status }),
+  };
+  const serialized = JSON.stringify(record);
+  try {
+    (logger ?? console.warn)(serialized);
+  } catch {
+    // Logging must never change the stable 503 response.
+  }
 }
 
 export async function enforceCookieMutationSecurity(
