@@ -74,7 +74,9 @@ Usage 증가만으로 두 명령 성공을 판단하지 않는다. HTTP 200 pipe
 
 확인된 증상은 운영 로그인 요청이 Middleware에서 503으로 종료된 것이다. 초기에 Usage 증가가 관찰되지 않았고, 이후 Usage 증가와 `upstash_pipeline_error` → `upstash_pipeline_command_error`가 관찰되어 진단 로그를 단계적으로 보강했다(PR #93, #94, #95).
 
-현재 문서 작성 근거만으로는 실제 실패 명령·토큰 종류·키 자료형 또는 복구 성공을 확정할 수 없다. Standard 토큰은 점검할 유력 항목이며, 아래 교체 절차는 원인이 확인됐을 때 실행한다. 실제 운영 로그의 `command_errors`와 승인된 변경 후 결과를 확보한 뒤 장애 기록을 보완한다.
+그 후 Vercel Production 로그의 `command_errors`에서 **INCR와 EXPIRE 모두 `permission_denied`**로 확인됐다. 이번 장애 원인은 rate limit의 쓰기 명령에 필요한 권한이 없는 토큰 사용이었다. 손 대표님이 서버용 쓰기 권한을 가진 **Standard REST 토큰으로 교체한 뒤 운영 로그인 정상 동작과 Upstash Usage 증가를 확인**했다.
+
+위 운영 결과는 [PR #96 플래너 확인 코멘트](https://github.com/sonprogrammer/connecting-space/pull/96#issuecomment-6382383052)에 근거한다. 이 문서 작업에서 운영 설정을 변경하거나 복구를 재실행한 것은 아니다. 키의 비숫자 값·자료형 문제가 이번 장애 원인으로 확인된 것은 아니며, Usage 증가만으로 복구를 판정하지 않고 로그인 정상 동작도 함께 확인했다. 아래 절차는 같은 권한 오류가 재발할 때 사용할 대응 절차다.
 
 ### Standard REST 토큰 확인
 
