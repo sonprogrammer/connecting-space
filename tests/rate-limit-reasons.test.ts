@@ -38,6 +38,9 @@ for (const current of cases) {
       assert.equal((await response?.json()).error.code, "RATE_LIMIT_UNAVAILABLE");
       assert.deepEqual(logs.map((entry) => JSON.parse(entry)), [{
         event: "rate_limit_unavailable", provider: "upstash", reason: current.reason,
+        ...(current.reason === "upstash_pipeline_command_error"
+          ? { command_errors: [{ command: "expire", error_type: "unknown" }] }
+          : {}),
       }]);
       for (const value of [...sensitive.split(" "), "private-hash-secret"]) {
         assert.equal(logs.join("").includes(value), false);
