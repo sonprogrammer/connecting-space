@@ -4,6 +4,7 @@ export type {
   PaymentRow,
 } from "./api/contracts";
 export { calculateProjectPaymentSummary } from "./model/summary";
+export type { AdminFinancialSummaryResponse } from "./api/financial-summary";
 export type {
   PaymentBalance,
   PaymentKind,

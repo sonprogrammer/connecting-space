@@ -564,6 +564,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      get_admin_financial_summary: {
+        Args: { p_status?: string };
+        Returns: Json;
+      };
       is_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
