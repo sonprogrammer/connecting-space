@@ -23,6 +23,7 @@ import {
   type WorkItemSort,
 } from "../model/admin-today-dashboard";
 import { getLegacyInquiryRedirect } from "../model/admin-route-overview";
+import { AdminDashboardPreviewPanels } from "./admin-dashboard-preview-panels";
 
 export { getLegacyInquiryRedirect } from "../model/admin-route-overview";
 
@@ -157,6 +158,8 @@ export function AdminRouteOverview() {
           {query.hasNextPage ? <div className="border-t border-[var(--admin-border)] p-4 text-center"><button type="button" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-[var(--admin-border)] px-4 text-sm font-semibold text-[var(--admin-text)] outline-none hover:bg-[var(--admin-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--admin-focus)] disabled:opacity-60">{query.isFetchingNextPage ? <LoaderCircle aria-hidden="true" className="size-4 animate-spin" /> : null}더 불러오기</button></div> : null}
         </> : null}
       </section>
+
+      <AdminDashboardPreviewPanels />
 
       <nav aria-label="기존 관리자 기능" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{featureItems.map((item) => <Link key={item.id} href={item.href} className="flex min-h-14 items-center justify-between rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface)] px-4 text-sm font-semibold text-[var(--admin-text)] outline-none hover:bg-[var(--admin-surface-muted)] focus-visible:ring-2 focus-visible:ring-[var(--admin-focus)]">{item.label}<ArrowRight aria-hidden="true" className="size-4 text-[var(--admin-text-muted)]" /></Link>)}</nav>
       <WorkItemDialog item={selectedItem} onClose={() => setSelectedItem(null)} />
