@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
+import { QueryClient } from "@tanstack/react-query";
 
 import { registerPathAlias } from "./helpers/register-path-alias";
 
@@ -45,6 +47,24 @@ describe("admin financial summary queries", () => {
         assert.equal((error as { status?: number }).status, status);
         return true;
       });
+    }
+  });
+
+  test("invalidates active, individual, and all financial summary scopes after mutations", async () => {
+    const client = new QueryClient();
+    const keys = ["active", "planning", "all"] as const;
+    for (const status of keys) client.setQueryData(queries.adminFinancialSummaryQueryKeys.byStatus(status), responseData);
+    await queries.invalidateAdminFinancialSummaryQueries(client);
+    for (const status of keys) {
+      assert.equal(client.getQueryState(queries.adminFinancialSummaryQueryKeys.byStatus(status))?.isInvalidated, true);
+    }
+
+    for (const sourcePath of [
+      "src/widgets/admin-customer-projects/ui/project-payment-manager.tsx",
+      "src/widgets/admin-customer-projects/ui/admin-customer-project-manager.tsx",
+      "src/features/convert-inquiry-to-project/ui/inquiry-conversion-panel.tsx",
+    ]) {
+      assert.match(readFileSync(sourcePath, "utf8"), /invalidateAdminFinancialSummaryQueries\(queryClient\)/);
     }
   });
 });

@@ -1,4 +1,4 @@
-import { queryOptions } from "@tanstack/react-query";
+import { queryOptions, type QueryClient } from "@tanstack/react-query";
 import {
   financialSummaryQuerySchema,
   financialSummarySchema,
@@ -66,4 +66,8 @@ export function adminFinancialSummaryQueryOptions(
     queryKey: adminFinancialSummaryQueryKeys.byStatus(status),
     queryFn: ({ signal }) => fetchAdminFinancialSummary(status, fetcher, signal),
   });
+}
+
+export function invalidateAdminFinancialSummaryQueries(queryClient: QueryClient) {
+  return queryClient.invalidateQueries({ queryKey: adminFinancialSummaryQueryKeys.all });
 }
