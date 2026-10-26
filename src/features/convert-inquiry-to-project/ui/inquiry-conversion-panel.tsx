@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Loader2, UserRoundPlus } from "lucide-react";
 
 import type { AdminInquiryDetail } from "@/entities/inquiry";
+import { invalidateAdminFinancialSummaryQueries } from "@/entities/payment";
 import { Button } from "@/shared/ui/button";
 import type { ApiResponse } from "@/shared/types/api";
 import { redirectToAdminLogin } from "@/shared/lib/auth/admin-login-redirect";
@@ -104,6 +105,7 @@ export function InquiryConversionPanel({
       void queryClient.invalidateQueries({ queryKey: adminInquiryQueryKeys.lists() });
       void queryClient.invalidateQueries({ queryKey: ["admin", "customers"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "projects"] });
+      void invalidateAdminFinancialSummaryQueries(queryClient);
       void resetAdminWorkItemsCache(queryClient);
       onInquiryUpdated(updatedInquiry);
       setConversionState({

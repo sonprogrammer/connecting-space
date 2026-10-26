@@ -5,6 +5,14 @@ export type {
 } from "./api/contracts";
 export { calculateProjectPaymentSummary } from "./model/summary";
 export type { AdminFinancialSummaryResponse } from "./api/financial-summary";
+export {
+  AdminFinancialSummaryQueryError,
+  adminFinancialSummaryQueryKeys,
+  adminFinancialSummaryQueryOptions,
+  fetchAdminFinancialSummary,
+  invalidateAdminFinancialSummaryQueries,
+} from "./model/admin-financial-summary-queries";
+export type { AdminFinancialSummaryStatus } from "./model/admin-financial-summary-queries";
 export type {
   PaymentBalance,
   PaymentKind,

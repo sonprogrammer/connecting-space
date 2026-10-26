@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { resetAdminWorkItemsCache } from "@/entities/admin-work-item/model/reset-query-cache";
+import { invalidateAdminFinancialSummaryQueries } from "@/entities/payment";
 import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, RefreshCw, Search } from "lucide-react";
 
 import type { AdminCustomerDetail, AdminCustomerListItem } from "@/entities/customer";
@@ -33,8 +34,10 @@ type LinkedState<T> = { status: "idle" } | { status: "loading" } | { status: "su
 
 export function AdminCustomerProjectManager({
   initialTab = "customers",
+  initialProjectId,
 }: {
   initialTab?: AdminCustomerProjectTab;
+  initialProjectId?: string;
 }) {
   const [tab, setTab] = useState<AdminCustomerProjectTab>(initialTab);
   const [customerQuery, setCustomerQuery] = useState("");
@@ -46,7 +49,7 @@ export function AdminCustomerProjectManager({
   const [customerPage, setCustomerPage] = useState(1);
   const [projectPage, setProjectPage] = useState(1);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId ?? null);
   const [customerNotice, setCustomerNotice] = useState<{ id: string; message: string } | null>(null);
   const [projectNotice, setProjectNotice] = useState<{ id: string; message: string } | null>(null);
   const queryClient = useQueryClient();
@@ -75,9 +78,9 @@ export function AdminCustomerProjectManager({
     queueMicrotask(() => setSelectedCustomerId((current) => resolveSelectedId(current, customerListQuery.data.items)));
   }, [customerListQuery.data]);
   useEffect(() => {
-    if (!projectListQuery.data) return;
+    if (!projectListQuery.data || initialProjectId) return;
     queueMicrotask(() => setSelectedProjectId((current) => resolveSelectedId(current, projectListQuery.data.items)));
-  }, [projectListQuery.data]);
+  }, [projectListQuery.data, initialProjectId]);
   const refresh = () => {
     if (tab === "customers") {
       void customerListQuery.refetch();
@@ -90,7 +93,7 @@ export function AdminCustomerProjectManager({
   const selectCustomer = (item: AdminCustomerListItem) => { setSelectedCustomerId(item.id); setTab("customers"); };
   const selectProject = (item: AdminProjectListItem) => { setSelectedProjectId(item.id); setTab("projects"); };
   const saveCustomer = (item: AdminCustomerDetail) => { queryClient.setQueryData(customerProjectQueryKeys.customers.detail(item.id), item); setCustomerNotice({ id: item.id, message: "고객 정보를 저장했습니다." }); void queryClient.invalidateQueries({ queryKey: customerProjectQueryKeys.customers.lists() }); void resetAdminWorkItemsCache(queryClient); };
-  const saveProject = (item: AdminProjectDetail) => { queryClient.setQueryData(customerProjectQueryKeys.projects.detail(item.id), item); setProjectNotice({ id: item.id, message: "프로젝트 정보를 저장했습니다." }); void queryClient.invalidateQueries({ queryKey: customerProjectQueryKeys.projects.lists() }); void resetAdminWorkItemsCache(queryClient); };
+  const saveProject = (item: AdminProjectDetail) => { queryClient.setQueryData(customerProjectQueryKeys.projects.detail(item.id), item); setProjectNotice({ id: item.id, message: "프로젝트 정보를 저장했습니다." }); void queryClient.invalidateQueries({ queryKey: customerProjectQueryKeys.projects.lists() }); void invalidateAdminFinancialSummaryQueries(queryClient); void resetAdminWorkItemsCache(queryClient); };
   return (
     <section className="overflow-hidden rounded-lg border border-[#dfe3dc] bg-white">
       <div className="flex flex-col gap-4 border-b border-[#e8ebe5] p-5 sm:flex-row sm:items-center sm:justify-between">

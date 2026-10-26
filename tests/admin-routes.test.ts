@@ -21,7 +21,9 @@ describe("admin feature routes", () => {
     assert.match(inquiries, /<AdminInquiryList \/>/);
     assert.match(inquiries, /<AdminQuoteWorkflow \/>/);
     assert.match(customers, /<AdminCustomerProjectManager initialTab="customers" \/>/);
-    assert.match(projects, /<AdminCustomerProjectManager initialTab="projects" \/>/);
+    assert.match(projects, /searchParams: Promise<\{ project\?: string \| string\[\] \}>/);
+    assert.match(projects, /projectIdSchema\.safeParse\(requestedProject\)/);
+    assert.match(projects, /<AdminCustomerProjectManager initialTab="projects" initialProjectId=\{initialProjectId\} \/>/);
     assert.match(portfolio, /<AdminPortfolioManager \/>/);
     assert.match(content, /<AdminAutomationContentManager \/>/);
   });

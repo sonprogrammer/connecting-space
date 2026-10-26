@@ -5,6 +5,7 @@ import { QueryClient } from "@tanstack/react-query";
 
 import {
   customerProjectQueryKeys,
+  fetchProjectList,
   parseAdminQueryResponse,
   type AdminQueryError,
 } from "../src/widgets/admin-customer-projects/model/admin-customer-project-queries";
@@ -20,6 +21,34 @@ describe("admin customer/project query model", () => {
       customerProjectQueryKeys.projects.list(1, "", "planning"),
       customerProjectQueryKeys.projects.list(1, "", "completed"),
     );
+  });
+
+  test("project list keys include sort direction and page size", () => {
+    const defaultKey = customerProjectQueryKeys.projects.list(1, "", "in_progress");
+    const launchDateKey = customerProjectQueryKeys.projects.list(1, "", "in_progress", {
+      pageSize: 20, sort: "expected_launch_date", direction: "asc",
+    });
+    assert.notDeepEqual(defaultKey, launchDateKey);
+    assert.deepEqual(launchDateKey.at(-1), {
+      page: 1, query: "", status: "in_progress", pageSize: 20, sort: "expected_launch_date", direction: "asc",
+    });
+  });
+
+  test("project list sends the requested launch-date order", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestedUrl = "";
+    globalThis.fetch = async (input) => {
+      requestedUrl = String(input);
+      return new Response(JSON.stringify({ data: { items: [], page: 1, pageSize: 20, total: 0, totalPages: 0 } }));
+    };
+    try {
+      await fetchProjectList(1, "", "in_progress", {
+        pageSize: 20, sort: "expected_launch_date", direction: "asc",
+      });
+      assert.equal(requestedUrl, "/api/admin/projects?page=1&pageSize=20&sort=expected_launch_date&direction=asc&status=in_progress");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   test("turns an API failure into an error with status and auth flag", async () => {
