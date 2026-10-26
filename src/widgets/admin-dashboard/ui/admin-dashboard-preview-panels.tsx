@@ -14,6 +14,7 @@ import {
   adminDashboardInquiryQueryOptions,
   adminUpcomingProjectQueryOptions,
   getProjectLaunchDateLabel,
+  getProjectPreviewHref,
   getRecentInquiryPreview,
   getUpcomingProjectPreview,
 } from "../model/admin-dashboard-preview-queries";
@@ -69,7 +70,7 @@ function ProjectPreview() {
 }
 
 function ProjectRow({ item }: Readonly<{ item: AdminProjectListItem }>) {
-  return <li><Link href="/admin/projects" className="block min-h-16 px-4 py-3 outline-none hover:bg-[var(--admin-surface-muted)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--admin-focus)]"><span className="flex items-start justify-between gap-3"><span className="min-w-0 truncate text-sm font-semibold text-[var(--admin-text)]">{item.name}</span><span className="shrink-0 text-xs text-[var(--admin-text-muted)]">{projectStatusLabels[item.status as ProjectStatus]}</span></span><span className="mt-1 block text-xs text-[var(--admin-text-muted)]">예정 출시일: {getProjectLaunchDateLabel(item.expected_launch_date)}</span></Link></li>;
+  return <li><Link href={getProjectPreviewHref(item.id)} className="block min-h-16 px-4 py-3 outline-none hover:bg-[var(--admin-surface-muted)] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--admin-focus)]"><span className="flex items-start justify-between gap-3"><span className="min-w-0 truncate text-sm font-semibold text-[var(--admin-text)]">{item.name}</span><span className="shrink-0 text-xs text-[var(--admin-text-muted)]">{projectStatusLabels[item.status as ProjectStatus]}</span></span><span className="mt-1 block text-xs text-[var(--admin-text-muted)]">예정 출시일: {getProjectLaunchDateLabel(item.expected_launch_date)}</span></Link></li>;
 }
 
 export function AdminDashboardPreviewPanels() {

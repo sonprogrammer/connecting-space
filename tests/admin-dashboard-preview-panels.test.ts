@@ -43,4 +43,9 @@ describe("admin dashboard preview panels", () => {
     assert.equal(preview.getProjectLaunchDateLabel(null), "예정일 미정");
     assert.equal(preview.getProjectLaunchDateLabel("2026-11-02"), "2026-11-02");
   });
+
+  test("project preview links to the selected project detail", () => {
+    assert.equal(preview.getProjectPreviewHref("project-123"), "/admin/projects?project=project-123");
+    assert.equal(preview.getProjectPreviewHref("id with space"), "/admin/projects?project=id%20with%20space");
+  });
 });

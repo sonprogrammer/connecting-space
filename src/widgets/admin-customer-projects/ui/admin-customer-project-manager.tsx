@@ -34,8 +34,10 @@ type LinkedState<T> = { status: "idle" } | { status: "loading" } | { status: "su
 
 export function AdminCustomerProjectManager({
   initialTab = "customers",
+  initialProjectId,
 }: {
   initialTab?: AdminCustomerProjectTab;
+  initialProjectId?: string;
 }) {
   const [tab, setTab] = useState<AdminCustomerProjectTab>(initialTab);
   const [customerQuery, setCustomerQuery] = useState("");
@@ -47,7 +49,7 @@ export function AdminCustomerProjectManager({
   const [customerPage, setCustomerPage] = useState(1);
   const [projectPage, setProjectPage] = useState(1);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId ?? null);
   const [customerNotice, setCustomerNotice] = useState<{ id: string; message: string } | null>(null);
   const [projectNotice, setProjectNotice] = useState<{ id: string; message: string } | null>(null);
   const queryClient = useQueryClient();
@@ -76,9 +78,9 @@ export function AdminCustomerProjectManager({
     queueMicrotask(() => setSelectedCustomerId((current) => resolveSelectedId(current, customerListQuery.data.items)));
   }, [customerListQuery.data]);
   useEffect(() => {
-    if (!projectListQuery.data) return;
+    if (!projectListQuery.data || initialProjectId) return;
     queueMicrotask(() => setSelectedProjectId((current) => resolveSelectedId(current, projectListQuery.data.items)));
-  }, [projectListQuery.data]);
+  }, [projectListQuery.data, initialProjectId]);
   const refresh = () => {
     if (tab === "customers") {
       void customerListQuery.refetch();

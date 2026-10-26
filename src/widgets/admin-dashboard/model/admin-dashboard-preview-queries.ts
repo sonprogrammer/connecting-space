@@ -39,3 +39,7 @@ export function getUpcomingProjectPreview(items: readonly AdminProjectListItem[]
 export function getProjectLaunchDateLabel(date: string | null) {
   return date ?? "예정일 미정";
 }
+
+export function getProjectPreviewHref(projectId: string) {
+  return `/admin/projects?project=${encodeURIComponent(projectId)}`;
+}
