@@ -42,8 +42,10 @@ export const customerProjectQueryKeys = {
   projects: {
     all: ["admin", "projects"] as const,
     lists: () => [...customerProjectQueryKeys.projects.all, "list"] as const,
-    list: (page: number, query: string, status: ProjectStatus | "") =>
-      [...customerProjectQueryKeys.projects.lists(), { page, query, status }] as const,
+    list: (page: number, query: string, status: ProjectStatus | "", settings: ProjectListQuerySettings = {}) => {
+      const normalized = normalizeProjectListQuerySettings(settings);
+      return [...customerProjectQueryKeys.projects.lists(), { page, query, status, ...normalized }] as const;
+    },
     details: () => [...customerProjectQueryKeys.projects.all, "detail"] as const,
     detail: (id: string) => [...customerProjectQueryKeys.projects.details(), id] as const,
   },
@@ -52,6 +54,20 @@ export const customerProjectQueryKeys = {
     detail: (id: string) => [...customerProjectQueryKeys.inquiries.all, "detail", id] as const,
   },
 };
+
+export type ProjectListQuerySettings = {
+  pageSize?: number;
+  sort?: "created_at" | "name" | "status" | "expected_launch_date";
+  direction?: "asc" | "desc";
+};
+
+function normalizeProjectListQuerySettings(settings: ProjectListQuerySettings) {
+  return {
+    pageSize: settings.pageSize ?? 20,
+    sort: settings.sort ?? "created_at",
+    direction: settings.direction ?? "desc",
+  };
+}
 
 export async function parseAdminQueryResponse<T>(response: Response): Promise<T> {
   const result = (await response.json()) as ApiResponse<T>;
@@ -75,8 +91,14 @@ export function fetchCustomerList(page: number, query: string) {
   return fetchAdmin<AdminCustomerListResponse>(`/api/admin/customers?${params}`);
 }
 
-export function fetchProjectList(page: number, query: string, status: ProjectStatus | "") {
-  const params = new URLSearchParams({ page: String(page), pageSize: "20", sort: "created_at", direction: "desc" });
+export function fetchProjectList(page: number, query: string, status: ProjectStatus | "", settings: ProjectListQuerySettings = {}) {
+  const normalized = normalizeProjectListQuerySettings(settings);
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(normalized.pageSize),
+    sort: normalized.sort,
+    direction: normalized.direction,
+  });
   if (query) params.set("q", query);
   if (status) params.set("status", status);
   return fetchAdmin<AdminProjectListResponse>(`/api/admin/projects?${params}`);
