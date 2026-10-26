@@ -28,7 +28,7 @@ export function registerPathAlias() {
     isMain,
     options,
   ) {
-    const resolvedRequest = request.startsWith("@/")
+    const resolvedRequest = request === "server-only" ? "next/dist/compiled/server-only/empty.js" : request.startsWith("@/")
       ? path.join(compiledSourceRoot, request.slice(2))
       : request;
 
