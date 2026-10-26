@@ -134,7 +134,7 @@
 - [x] Read the relevant installed Next.js documentation before UI code changes if not already done.
 - [x] Run `npm test`, `npm run lint`, `npm run type-check`, `npm run build -- --webpack`, and `git diff --check origin/main...HEAD`; record actual pass/fail/skip results.
 - [x] Inspect the final diff and verify 360px, 768px, and 1280px layout behavior in Browser if available; otherwise list those exact manual checks as unverified in the PR.
-- [ ] Create a separate PR linked with `Closes #37`, document the un-applied production migration as out of frontend scope, and request independent frontend QA on the full HEAD SHA. Do not merge, deploy, or modify remote DB.
+- [x] Create a separate PR linked with `Closes #37`, document the un-applied production migration as out of frontend scope, and request independent frontend QA on the full HEAD SHA. Do not merge, deploy, or modify remote DB.
 
 ## Coverage Self-Review
 
