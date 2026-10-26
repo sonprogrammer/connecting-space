@@ -24,6 +24,7 @@ import {
 } from "../model/admin-today-dashboard";
 import { getLegacyInquiryRedirect } from "../model/admin-route-overview";
 import { AdminDashboardPreviewPanels } from "./admin-dashboard-preview-panels";
+import { AdminFinancialSummaryPanel } from "./admin-financial-summary-panel";
 
 export { getLegacyInquiryRedirect } from "../model/admin-route-overview";
 
@@ -123,6 +124,8 @@ export function AdminRouteOverview() {
           </button>;
         })}
       </div>
+
+      <AdminFinancialSummaryPanel />
 
       <section aria-labelledby="today-task-list-title" aria-busy={initialLoading || query.isFetchingNextPage} className="overflow-hidden rounded-xl border border-[var(--admin-border)] bg-[var(--admin-surface)]">
         <div className="border-b border-[var(--admin-border)] p-4 sm:px-5">
