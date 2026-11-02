@@ -2,6 +2,8 @@ import type {
   AdminProjectDocumentGenerationInput,
   AdminProjectDocumentJob,
   AdminProjectDocument,
+  AdminProjectDocumentResponse,
+  AdminProjectDocumentVersionSummary,
   ProjectDocumentContent,
   ProjectDocumentKind,
 } from "@/entities/document";
@@ -16,6 +18,18 @@ export function buildAdminDocumentGenerationInput(
     return { type, requestKey: latestJob.request_key, retry: true };
   }
   return { type, requestKey: createRequestKey() };
+}
+
+export function collectAdminDocumentVersions(
+  pages: readonly (AdminProjectDocumentResponse | undefined)[],
+): AdminProjectDocumentVersionSummary[] {
+  const seen = new Set<string>();
+  return pages.flatMap((page) => page?.versions ?? []).filter((version) => {
+    const key = `${version.document_id}:${version.version}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function getAdminDocumentPollingInterval(query: {

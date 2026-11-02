@@ -110,7 +110,7 @@ describe("admin project documents generation UI", () => {
     assert.match(source, /content:\s*editor\.value/);
     assert.match(source, /onSuccess:\s*\(saved, input\)/);
     assert.match(source, /baseRevision:\s*saved\.version/);
-    assert.match(source, /queryClient\.invalidateQueries\(\{ queryKey: documentKey \}\)/);
+    assert.match(source, /adminProjectDocumentQueryKeys\.project\(projectId, input\.type\)/);
     assert.match(source, /buildAdminDocumentCopyText\(\{ \.\.\.document\.content, \.\.\.editor\.value \}\)/);
     const rebaseStart = source.indexOf("const rebaseDraft = () => {");
     const rebaseEnd = source.indexOf("\n  };", rebaseStart);
@@ -122,9 +122,53 @@ describe("admin project documents generation UI", () => {
     assert.match(source, /범위 항목/);
   });
 
+  test("dedicated project document route validates Next 16 promise params", () => {
+    const source = readFileSync("src/app/admin/projects/[id]/documents/page.tsx", "utf8");
+    assert.match(source, /params:\s*Promise<\{\s*id:\s*string\s*\}>/);
+    assert.match(source, /await params/);
+    assert.match(source, /projectIdSchema\.safeParse/);
+    assert.match(source, /<AdminProjectDocuments projectId=\{parsed\.data\}/);
+  });
+
+  test("project editor links to the project-scoped documents route", () => {
+    const source = readFileSync("src/widgets/admin-customer-projects/ui/admin-customer-project-manager.tsx", "utf8");
+    assert.match(source, /href=\{`\/admin\/projects\/\$\{selectedId\}\/documents`\}/);
+    assert.match(source, /제안서·계약서 초안/);
+  });
+
+  test("version history opens API-backed read-only content without changing the current editor", () => {
+    const source = readFileSync("src/widgets/admin-project-documents/ui/admin-project-documents.tsx", "utf8");
+    assert.match(source, /fetchAdminProjectDocumentVersion/);
+    assert.match(source, /adminProjectDocumentQueryKeys\.version\(projectId, type, selectedVersion \?\? 0\)/);
+    assert.match(source, /enabled:\s*selectedVersion !== null/);
+    assert.match(source, /aria-label="이전 버전 이력"/);
+    assert.match(source, /읽기 전용/);
+    assert.match(source, /setSelectedVersion\(version\.version\)/);
+    assert.match(source, /min-w-0/);
+    assert.match(source, /Array\.from\(\{ length: historyPage \}/);
+    assert.match(source, /getQueryData<AdminProjectDocumentResponse>/);
+    assert.match(source, /role="tabpanel" aria-labelledby=\{`document-tab-\$\{type\}`\}/);
+    assert.match(source, /fetchProjectDetail\(projectId\)/);
+    assert.match(source, /customerProjectQueryKeys\.projects\.detail\(projectId\)/);
+    assert.match(source, /xl:grid-cols-\[minmax\(0,2fr\)_minmax\(17rem,1fr\)\]/);
+    assert.match(source, /aria-controls="document-panel"/);
+    assert.match(source, /aria-readonly="true"/);
+  });
+
+  test("version history pages append in server order without duplicate entries", () => {
+    const makeVersion = (version: number) => ({
+      document_id: "doc-1", version, source: "manual" as const,
+      request_key: `request-${version}`, created_by: null, created_at: `2026-10-0${version}T00:00:00Z`,
+    });
+    assert.deepEqual(documentState.collectAdminDocumentVersions([
+      { document: null, versions: [makeVersion(3), makeVersion(2)], pagination: { page: 1, pageSize: 2, total: 3 }, jobs: [] },
+      { document: null, versions: [makeVersion(2), makeVersion(1)], pagination: { page: 2, pageSize: 2, total: 3 }, jobs: [] },
+    ]).map(({ version }) => version), [3, 2, 1]);
+  });
+
   test("screen renders empty, processing, and safe cached-error states from the shared query", () => {
     const source = readFileSync("src/widgets/admin-project-documents/ui/admin-project-documents.tsx", "utf8");
-    assert.match(source, /adminProjectDocumentQueryKeys\.detail\(projectId, type\)/);
+    assert.match(source, /adminProjectDocumentQueryKeys\.detail\(projectId, type, historyPage\)/);
     assert.match(source, /queryKey: documentKey/);
     assert.match(source, /refetchInterval:\s*\(query\)\s*=>\s*getAdminDocumentPollingInterval/);
     assert.match(source, /!document \?/);
@@ -132,7 +176,7 @@ describe("admin project documents generation UI", () => {
     assert.match(source, /getAdminDocumentQueryWarning\(Boolean\(query\.data\), query\.error\)/);
     assert.match(source, /useMutation/);
     assert.match(source, /disabled=\{generation\.isPending\}/);
-    assert.match(source, /queryClient\.invalidateQueries\(\{ queryKey: documentKey \}\)/);
+    assert.match(source, /queryClient\.invalidateQueries\(\{\s*queryKey: adminProjectDocumentQueryKeys\.project\(projectId, input\.type\)\s*,?\s*\}\)/);
   });
 });
 

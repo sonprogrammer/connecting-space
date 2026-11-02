@@ -81,10 +81,12 @@ export class AdminDocumentQueryError extends Error {
 export const adminProjectDocumentQueryKeys = {
   all: ["admin", "project-documents"] as const,
   details: () => [...adminProjectDocumentQueryKeys.all, "detail"] as const,
+  project: (projectId: string, type: ProjectDocumentKind) =>
+    [...adminProjectDocumentQueryKeys.details(), projectId, type] as const,
   detail: (projectId: string, type: ProjectDocumentKind, page = 1) =>
-    [...adminProjectDocumentQueryKeys.details(), projectId, type, { page, pageSize: 20 }] as const,
+    [...adminProjectDocumentQueryKeys.project(projectId, type), { page, pageSize: 20 }] as const,
   version: (projectId: string, type: ProjectDocumentKind, version: number) =>
-    [...adminProjectDocumentQueryKeys.details(), projectId, type, "version", version] as const,
+    [...adminProjectDocumentQueryKeys.project(projectId, type), "version", version] as const,
 };
 
 async function parseAdminDocumentResponse<T>(response: Response): Promise<T> {
