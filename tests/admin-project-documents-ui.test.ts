@@ -69,6 +69,14 @@ describe("admin project documents generation UI", () => {
     });
   });
 
+  test("first document load derives an editor draft from server content", () => {
+    assert.deepEqual(documentState.reconcileAdminDocumentEditor(null, makeDocument(1, "First draft")), {
+      baseRevision: 1,
+      base: { title: "First draft", summary: "Server summary", scopeItems: ["Server scope"] },
+      value: { title: "First draft", summary: "Server summary", scopeItems: ["Server scope"] },
+    });
+  });
+
   test("revision conflict exposes a safe message without clearing the editor", () => {
     const dirtyEditor = {
       baseRevision: 1,
