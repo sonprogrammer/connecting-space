@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Clipboard, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import {
   AdminDocumentQueryError,
@@ -41,6 +41,10 @@ const documentKinds: Array<{ value: ProjectDocumentKind; label: string }> = [
 ];
 
 export function AdminProjectDocuments({ projectId }: Readonly<{ projectId: string }>) {
+  return <AdminProjectDocumentsContent key={projectId} projectId={projectId} />;
+}
+
+function AdminProjectDocumentsContent({ projectId }: Readonly<{ projectId: string }>) {
   const [type, setType] = useState<ProjectDocumentKind>("proposal");
   const [historyPage, setHistoryPage] = useState(1);
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
@@ -52,7 +56,6 @@ export function AdminProjectDocuments({ projectId }: Readonly<{ projectId: strin
   const query = useQuery({
     queryKey: documentKey,
     queryFn: () => fetchAdminProjectDocument(projectId, type, historyPage),
-    placeholderData: keepPreviousData,
     refetchInterval: (query) => getAdminDocumentPollingInterval(query),
   });
   const projectQuery = useQuery({

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
+import { QueryClient, QueryObserver } from "@tanstack/react-query";
+import type { AdminProjectDocumentResponse } from "@/entities/document";
 import { registerPathAlias } from "./helpers/register-path-alias";
 registerPathAlias();
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -75,6 +77,41 @@ describe("admin project documents generation UI", () => {
       base: { title: "First draft", summary: "Server summary", scopeItems: ["Server scope"] },
       value: { title: "First draft", summary: "Server summary", scopeItems: ["Server scope"] },
     });
+  });
+
+  test("project and kind changes cannot reuse another document query or editor instance", () => {
+    const source = readFileSync("src/widgets/admin-project-documents/ui/admin-project-documents.tsx", "utf8");
+    assert.match(source, /<AdminProjectDocumentsContent key=\{projectId\} projectId=\{projectId\}/);
+    assert.doesNotMatch(source, /keepPreviousData|placeholderData/);
+
+    const client = new QueryClient();
+    const projectA = makeDocument(1, "Project A confidential draft");
+    const projectB = { ...makeDocument(1, "Project B draft"), project_id: "project-b", kind: "contract" as const };
+    const keyA = documentApi.adminProjectDocumentQueryKeys.detail("project-a", "proposal", 1);
+    const keyB = documentApi.adminProjectDocumentQueryKeys.detail("project-b", "contract", 1);
+    client.setQueryData(keyA, { document: projectA, versions: [], pagination: { page: 1, pageSize: 20, total: 0 }, jobs: [] });
+    const observer = new QueryObserver<AdminProjectDocumentResponse>(client, {
+      queryKey: keyA,
+      queryFn: async () => client.getQueryData<AdminProjectDocumentResponse>(keyA)!,
+    });
+    const unsubscribe = observer.subscribe(() => {});
+
+    assert.equal(observer.getCurrentResult().data?.document?.content?.title, "Project A confidential draft");
+    observer.setOptions({ queryKey: keyB, queryFn: () => new Promise<AdminProjectDocumentResponse>(() => {}) });
+
+    const switchedResult = observer.getCurrentResult();
+    assert.equal(switchedResult.isPlaceholderData, false);
+    assert.equal(switchedResult.data, undefined);
+    client.setQueryData(keyB, {
+      document: projectB,
+      versions: [],
+      pagination: { page: 1, pageSize: 20, total: 0 },
+      jobs: [],
+    });
+    assert.equal(observer.getCurrentResult().data?.document?.content?.title, "Project B draft");
+    unsubscribe();
+    observer.destroy();
+    client.clear();
   });
 
   test("revision conflict exposes a safe message without clearing the editor", () => {
