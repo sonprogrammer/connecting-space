@@ -9,6 +9,24 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      project_widgets: {
+        Row: { id: string; project_id: string; kind: string; revision: number; version_count: number; content: Json | null };
+        Insert: { id?: string; project_id: string; kind: string; revision?: number; version_count?: number; content?: Json | null };
+        Update: Partial<Database["public"]["Tables"]["project_widgets"]["Insert"]>;
+        Relationships: [];
+      };
+      project_widget_versions: {
+        Row: { widget_id: string; version: number; source: string; request_key: string; content: Json; created_by: string | null; created_at: string };
+        Insert: { widget_id: string; version: number; source: string; request_key: string; content: Json; created_by?: string | null; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["project_widget_versions"]["Insert"]>;
+        Relationships: [];
+      };
+      project_widget_jobs: {
+        Row: { id: string; widget_id: string; request_key: string; status: string; lease_token: string; lease_until: string; base_revision: number; attempt_count: number; context: Json; version: number | null; applied: boolean; history: Json; created_by: string | null; created_at: string };
+        Insert: { id?: string; widget_id: string; request_key: string; status: string; lease_token?: string; lease_until?: string; base_revision: number; attempt_count?: number; context: Json; version?: number | null; applied?: boolean; history?: Json; created_by?: string | null; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["project_widget_jobs"]["Insert"]>;
+        Relationships: [];
+      };
       project_documents: {
         Row: { id: string; project_id: string; kind: string; revision: number; version_count: number; content: Json | null };
         Insert: { id?: string; project_id: string; kind: string; revision?: number; version_count?: number; content?: Json | null };
@@ -582,6 +600,10 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      claim_project_widget: { Args: { p_project_id: string; p_kind: string; p_request_key: string; p_retry?: boolean; p_requirements?: Json }; Returns: Json };
+      finish_project_widget: { Args: { p_job_id: string; p_lease_token: string; p_content?: Json | null; p_error?: string | null; p_provider?: string | null; p_model?: string | null; p_input_tokens?: number | null; p_output_tokens?: number | null }; Returns: Json };
+      read_project_widget: { Args: { p_project_id: string; p_kind: string; p_version?: number; p_page?: number; p_page_size?: number }; Returns: Json };
+      read_project_widget_jobs: { Args: { p_project_id: string; p_kind: string }; Returns: Json };
       claim_project_document: { Args: { p_project_id: string; p_kind: string; p_request_key: string; p_retry?: boolean }; Returns: Json };
       finish_project_document: { Args: { p_job_id: string; p_lease_token: string; p_content?: Json | null; p_error?: string | null; p_provider?: string | null; p_model?: string | null; p_input_tokens?: number | null; p_output_tokens?: number | null }; Returns: Json };
       save_project_document: { Args: { p_project_id: string; p_kind: string; p_request_key: string; p_expected_revision: number; p_content: Json }; Returns: Json };
